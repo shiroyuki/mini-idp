@@ -1,0 +1,6 @@
+fastapi[standard]
+imagination
+pyyaml~=6.0
+sqlalchemy
+sqlalchemy[asyncio]
+psycopg2-binary

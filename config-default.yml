@@ -1,0 +1,62 @@
+realms:
+  # For the conversation service (github.com/shiroyuki/converstaion-service)
+  - name: conversation-app
+    roles:
+      - name: 'conversation/admin'
+      - name: 'conversation/user'
+    users:
+      - username: 'u_alpha'
+        password: 'c5f2376e339de10f' # openssl rand -hex 8
+        roles: ['conversation/admin']
+      - username: 'u_bravo'
+        password: '200ab50c5b29302b' # openssl rand -hex 8
+        roles: ['conversation/user']
+    clients:
+      - id: 'conversation-app'
+        secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
+        audience: 'http://localhost:8080/'
+        grant_type:
+          - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
+          - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
+        response_type: ['code']
+        scopes:
+          # Common Scopes
+          - 'openid'
+          - 'profile'
+          # Flow-specific Scope
+          - 'offline_access'  # NOTE: Standard scope
+          # Flow-specific Scope
+          - 'user.read'  # NOTE: Copied from MS Docs
+          # App-specific Scopes
+          - 'conversation:admin'
+          - 'conversation:user'
+    policies:
+      - resource: 'http://localhost:8080/'
+        subjects:
+          - type: 'role'
+            subject: 'conversation/admin'
+        scopes:
+          # Common Scopes
+          - 'openid'
+          - 'profile'
+          # Flow-specific Scope
+          - 'offline_access'  # NOTE: Standard scope
+          # Flow-specific Scope
+          - 'user.read'  # NOTE: Copied from MS Docs
+          # App-specific Scopes
+          - 'conversation:admin'
+          - 'conversation:user'
+      - resource: 'http://localhost:8080/'
+        subjects:
+          - type: 'role'
+            subject: 'conversation/user'
+        scopes:
+          # Common Scopes
+          - 'openid'
+          - 'profile'
+          # Flow-specific Scope
+          - 'offline_access'  # NOTE: Standard scope
+          # Flow-specific Scope
+          - 'user.read'  # NOTE: Copied from MS Docs
+          # App-specific Scopes
+          - 'conversation:user'

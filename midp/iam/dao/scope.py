@@ -1,10 +1,9 @@
 from typing import Any, Dict
 
 from imagination.decorator.service import Service
-from sqlalchemy import text
 
-from midp.dao.atomic import AtomicDao, T
-from midp.models import IAMScope
+from midp.iam.dao.atomic import AtomicDao, InsertError
+from midp.iam.models import IAMScope
 from midp.rds import DataStore
 
 
@@ -12,6 +11,9 @@ from midp.rds import DataStore
 class ScopeDao(AtomicDao[IAMScope]):
     def __init__(self, datastore: DataStore):
         super().__init__(datastore, IAMScope.__tbl__)
+
+    def get(self, realm_id: str, id: str) -> IAMScope:
+        return self.select_one('realm_id = :realm_id AND (id = :id OR name = :id)', dict(realm_id=realm_id, id=id))
 
     def map_row(self, row: Dict[str, Any]) -> IAMScope:
         return IAMScope(**row)
@@ -31,6 +33,7 @@ class ScopeDao(AtomicDao[IAMScope]):
             "sensitive": obj.sensitive,
         }
 
-        self._datastore.execute_without_result(query, parameters)
+        if self._datastore.execute_without_result(query, parameters) == 0:
+            raise InsertError(obj)
 
         return obj

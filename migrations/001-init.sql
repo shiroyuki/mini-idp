@@ -62,9 +62,9 @@ CREATE TABLE client (
   name VARCHAR NOT NULL,
   encrypted_secret VARCHAR,
   audience VARCHAR NOT NULL,
-  grant_type VARCHAR NOT NULL,
-  response_type VARCHAR,
-  scopes VARCHAR[] NOT NULL,
+  grant_types JSONB NOT NULL,
+  response_types JSONB,
+  scopes JSONB NOT NULL,
   extras JSONB,
   description VARCHAR,
   FOREIGN KEY (realm_id) REFERENCES realm (id) ON DELETE CASCADE
@@ -79,7 +79,29 @@ CREATE TABLE iam_policy (
   name VARCHAR NOT NULL,
   subjects JSONB NOT NULL,
   resource VARCHAR NOT NULL,
-  scopes VARCHAR[] NOT NULL,
+  scopes JSONB NOT NULL,
   FOREIGN KEY (realm_id) REFERENCES realm (id) ON DELETE CASCADE
 );
 ALTER TABLE iam_policy ADD CONSTRAINT uniq_iam_policy_name UNIQUE (realm_id, name);
+
+-- Per-Realm Key-value Store
+DROP TABLE IF EXISTS realm_kv;
+CREATE TABLE realm_kv (
+    realm_id VARCHAR NOT NULL,
+    k VARCHAR NOT NULL,
+    v JSONB NOT NULL,
+    expiry_timestamp INTEGER,
+    PRIMARY KEY (realm_id, k),
+    FOREIGN KEY (realm_id) REFERENCES realm (id) ON DELETE CASCADE
+);
+CREATE INDEX idx_realm_kv_expiry_timestamp ON realm_kv (realm_id, k, expiry_timestamp);
+
+-- Root Key-value Store
+DROP TABLE IF EXISTS root_kv;
+CREATE TABLE root_kv (
+    k VARCHAR NOT NULL,
+    v JSONB NOT NULL,
+    expiry_timestamp INTEGER,
+    PRIMARY KEY (k)
+);
+CREATE INDEX idx_root_kv_expiry_timestamp ON root_kv (k, expiry_timestamp);

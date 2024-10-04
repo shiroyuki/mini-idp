@@ -2,24 +2,30 @@ from typing import Any, Dict, List
 
 from imagination.decorator.service import Service
 
-from midp.dao.atomic import AtomicDao
-from midp.dao.role import RoleDao
-from midp.models import IAMUser, IAMRole
+from midp.common.enigma import Enigma
+from midp.iam.dao.atomic import AtomicDao, InsertError
+from midp.iam.dao.role import RoleDao
+from midp.iam.models import IAMUser, IAMRole
 from midp.rds import DataStore
 
 
 @Service()
 class UserDao(AtomicDao[IAMUser]):
-    def __init__(self, datastore: DataStore, role_dao: RoleDao):
+    def __init__(self, datastore: DataStore, role_dao: RoleDao, enigma: Enigma):
         super().__init__(datastore, IAMUser.__tbl__)
         self._role_dao = role_dao
+        self._enigma = enigma
+
+    def get(self, realm_id: str, id: str) -> IAMUser:
+        return self.select_one('realm_id = :realm_id AND (id = :id OR name = :id OR email = :id)',
+                               dict(realm_id=realm_id, id=id))
 
     def map_row(self, row: Dict[str, Any]) -> IAMUser:
         user = IAMUser(
             id=row['id'],
             realm_id=row['realm_id'],
             name=row['name'],
-            password=None,
+            password=self._enigma.decrypt(row['hashed_password']).decode(),
             email=row['email'],
             full_name=row['full_name'],
             roles=self._get_roles_for(row['id']),
@@ -37,13 +43,14 @@ class UserDao(AtomicDao[IAMUser]):
             "id": obj.id,
             "realm_id": obj.realm_id,
             "name": obj.name,
-            "hashed_password": obj.password,  # TODO Hash this password
+            "hashed_password": self._enigma.encrypt(obj.password).decode(),
             "password_salt": '',  # TODO Generate the partial salt
             "email": obj.email,
             "full_name": obj.full_name,
         }
 
-        self._datastore.execute_without_result(query, parameters)
+        if self._datastore.execute_without_result(query, parameters) == 0:
+            raise InsertError(obj)
 
         if obj.roles:
             parameter_set: List[Dict[str, Any]] = []
@@ -56,13 +63,13 @@ class UserDao(AtomicDao[IAMUser]):
             for role in roles:
                 parameter_set.append(dict(user_id=obj.id, role_id=role.id))
 
-            self._datastore.execute_without_result(
-                """
+            additional_insertions = """
                 INSERT INTO iam_user_role (user_id, role_id)
                 VALUES (:user_id, :role_id)
-                """,
-                parameters=parameter_set
-            )
+            """
+
+            if self._datastore.execute_without_result(additional_insertions, parameter_set) == 0:
+                raise InsertError(obj)
 
         return obj
 

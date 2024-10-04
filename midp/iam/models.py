@@ -48,8 +48,15 @@ class PredefinedScope:
 
     ROOT_ADMIN = IAMScope.predefined('root:admin', 'Root Administrator')  # for direct access to all APIs for all realms
     REALM_ADMIN = IAMScope.predefined('realm:admin',
-                                   'Realm Administrator')  # for direct access to all APIs for one specific realm
-    USER_READ = IAMScope.predefined('user.read', 'Read Access to User Profile')  # for an OAuth2 to impersonate as a user
+                                      'Realm Administrator')  # for direct access to all APIs for one specific realm
+    USER_READ = IAMScope.predefined('user.read',
+                                    'Read Access to User Profile')  # for an OAuth2 to impersonate as a user
+
+
+PREDEFINED_SCOPES = [getattr(PredefinedScope, p_name)
+                     for p_name in dir(PredefinedScope)
+                     if p_name[0] != '_' and isinstance(getattr(PredefinedScope, p_name), IAMScope)]
+PREDEFINED_SCOPE_NAMES = [s.name for s in PREDEFINED_SCOPES]
 
 
 class IAMRole(BaseModel):
@@ -73,6 +80,26 @@ class IAMUser(BaseModel):
     roles: List[str] = Field(default_factory=list)  # Role URNs # Auxiliary Property: Augmented
 
 
+class ReadOnlyIAMUser(BaseModel):
+    id: str = None
+    realm_id: Optional[str] = None  # Hidden Property
+    name: str
+    email: str
+    full_name: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)  # Role URNs # Auxiliary Property: Augmented
+
+    @classmethod
+    def build_from(cls, user: IAMUser):
+        return cls(
+            id=user.id,
+            realm_id=user.realm_id,
+            name=user.name,
+            email=user.email,
+            full_name=user.full_name,
+            roles=user.roles,
+        )
+
+
 class OAuthClient(BaseModel):
     __tbl__ = 'client'
 
@@ -90,13 +117,14 @@ class OAuthClient(BaseModel):
 
 class IAMPolicySubject(BaseModel):
     subject: str  # ID or name
-    kind: str = Field(alias='type', pattern=r'client|user|role')
+    kind: str = Field(pattern=r'client|user|role')
 
 
 class IAMPolicy(BaseModel):
     __tbl__ = 'iam_policy'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    name: str
     realm_id: Optional[str] = None  # Hidden Property
     resource: str
     subjects: List[IAMPolicySubject]
@@ -130,7 +158,7 @@ class OpenIDConfiguration(BaseModel):
 
     @classmethod
     def make(cls, base_url: str, realm: Realm):
-        realm_base_url = urljoin(base_url, f'realms/{realm.urn}/')
+        realm_base_url = urljoin(base_url, f'realms/{realm.name}/')
 
         scopes: Set[str] = set()
         for policy in realm.policies:

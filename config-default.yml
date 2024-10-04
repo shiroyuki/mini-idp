@@ -1,24 +1,33 @@
 realms:
   # For the conversation service (github.com/shiroyuki/converstaion-service)
   - name: conversation-app
+    scopes:
+      - name: 'conversation.admin'
+      - name: 'conversation.user'
     roles:
-      - name: 'conversation/admin'
-      - name: 'conversation/user'
+      - name: 'conversation.admin'
+      - name: 'conversation.user'
     users:
-      - username: 'u_alpha'
+      - name: 'admin'
+        password: 'iamgenius!'
+        roles: ['conversation.admin']
+        email: 'admin@shiroyuki.com'
+      - name: 'u_alpha'
         password: 'c5f2376e339de10f' # openssl rand -hex 8
-        roles: ['conversation/admin']
-      - username: 'u_bravo'
+        email: 'u_alpha@conversatio.faux.shiroyuki.com'
+        roles: ['conversation.admin']
+      - name: 'u_bravo'
         password: '200ab50c5b29302b' # openssl rand -hex 8
-        roles: ['conversation/user']
+        email: 'u_bravo@conversatio.faux.shiroyuki.com'
+        roles: ['conversation.user']
     clients:
-      - id: 'conversation-app'
+      - name: 'conversation-app'
         secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
         audience: 'http://localhost:8080/'
-        grant_type:
+        grant_types:
           - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
           - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
-        response_type: ['code']
+        response_types: ['code']
         scopes:
           # Common Scopes
           - 'openid'
@@ -31,10 +40,11 @@ realms:
           - 'conversation:admin'
           - 'conversation:user'
     policies:
-      - resource: 'http://localhost:8080/'
+      - name: 'conversation.admin'
+        resource: 'http://localhost:8080/'
         subjects:
-          - type: 'role'
-            subject: 'conversation/admin'
+          - kind: 'role'
+            subject: 'conversation.admin'
         scopes:
           # Common Scopes
           - 'openid'
@@ -46,10 +56,11 @@ realms:
           # App-specific Scopes
           - 'conversation:admin'
           - 'conversation:user'
-      - resource: 'http://localhost:8080/'
+      - name: 'conversation.user'
+        resource: 'http://localhost:8080/'
         subjects:
-          - type: 'role'
-            subject: 'conversation/user'
+          - kind: 'role'
+            subject: 'conversation.user'
         scopes:
           # Common Scopes
           - 'openid'

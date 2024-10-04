@@ -4,6 +4,7 @@ realms:
       - name: scope_a
       - name: scope_b
         sensitive: true
+      - name: scope_1
     roles:
       - name: role_a
       - name: role_b
@@ -22,7 +23,7 @@ realms:
     clients:
       - name: 'app_0'
         secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
-        audience: 'http://localhost:8080/'
+        audience: 'http://localhost:8080/realms/auto-testing-a/'
         grant_types:
           - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
           - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
@@ -39,7 +40,8 @@ realms:
           - 'scope_a'
           - 'scope_b'
       - name: 'app_1'
-        audience: 'http://localhost:8080/'
+        secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
+        audience: 'http://localhost:8080/realms/auto-testing-a/'
         grant_types:
           - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
         response_types: ['code']
@@ -54,7 +56,7 @@ realms:
           - 'scope_b'
       - name: 'app_2'
         secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
-        audience: 'http://localhost:8080/'
+        audience: 'http://localhost:8080/realms/auto-testing-a/'
         grant_types:
           - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
         response_types: ['code']
@@ -67,9 +69,10 @@ realms:
           # App-specific Scopes
           - 'scope_b'
     policies:
-      - resource: 'http://localhost:8080/'
+      - name: 'iam-policy-for-role-a'
+        resource: 'http://localhost:8080/realms/auto-testing-a/'
         subjects:
-          - type: 'role'
+          - kind: 'role'
             subject: 'role_a'
         scopes:
           # Common Scopes
@@ -80,11 +83,11 @@ realms:
           # Flow-specific Scope
           - 'user.read'  # NOTE: Copied from MS Docs
           # App-specific Scopes
-          - 'conversation:admin'
-          - 'conversation:user'
-      - resource: 'http://localhost:8080/'
+          - 'scope_a'
+      - name: 'iam-policy-for-role-b'
+        resource: 'http://localhost:8080/realms/auto-testing-a/'
         subjects:
-          - type: 'role'
+          - kind: 'role'
             subject: 'role_b'
         scopes:
           # Common Scopes
@@ -95,7 +98,7 @@ realms:
           # Flow-specific Scope
           - 'user.read'  # NOTE: Copied from MS Docs
           # App-specific Scopes
-          - 'conversation:user'
+          - 'scope_b'
   - name: auto-testing-b
     scopes:
       - name: scope_a
@@ -103,6 +106,7 @@ realms:
         sensitive: true
     roles:
       - name: role_a
+      - name: role_2
     users: []
     clients: []
     policies: []

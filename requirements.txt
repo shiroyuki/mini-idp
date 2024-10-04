@@ -1,6 +1,10 @@
+cryptography
 fastapi[standard]
+jinja2
 imagination
+psycopg2-binary
 pyyaml~=6.0
+pyjwt[crypto]
+requests
 sqlalchemy
 sqlalchemy[asyncio]
-psycopg2-binary

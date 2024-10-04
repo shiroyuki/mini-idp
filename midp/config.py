@@ -1,13 +1,16 @@
-from typing import Dict, List
+from typing import List, Optional
+
 from imagination.standalone import container
 from pydantic import BaseModel, Field
-import yaml
 
-from midp.dao.realm import RealmDao
-from midp.dao.role import RoleDao
-from midp.dao.scope import ScopeDao
-from midp.dao.user import UserDao
-from midp.models import Realm
+from midp.iam.dao.client import ClientDao
+from midp.iam.dao.policy import PolicyDao
+from midp.iam.dao.realm import RealmDao
+from midp.iam.dao.role import RoleDao
+from midp.iam.dao.scope import ScopeDao
+from midp.iam.dao.user import UserDao
+from midp.log_factory import get_logger_for
+from midp.iam.models import Realm
 
 
 class MainConfig(BaseModel):
@@ -15,33 +18,15 @@ class MainConfig(BaseModel):
     realms: List[Realm]
 
 
-def restore_from_files(config_file_paths: List[str]):
-    """ Load from multiple files """
-    main_config = MainConfig(realms=[])
-    realms: Dict[str, Realm] = dict()
+def restore_from_snapshot(main_config: MainConfig):
+    logger = get_logger_for('snapshot_loader')
 
-    for config_file_path in config_file_paths:
-        config = restore_from_one_file(config_file_path)
-        for realm in config.realms:
-            realms[realm.name] = realm
-
-    main_config.realms.extend(realms.values())
-
-    restore_from_main_config(main_config=main_config)
-
-
-def restore_from_one_file(config_file_path: str):
-    """ Load from one file """
-    with open(config_file_path, 'r') as f:
-        raw_config = yaml.load(f.read(), Loader=yaml.BaseLoader)
-        return MainConfig(**raw_config)
-
-
-def restore_from_main_config(main_config: MainConfig):
     realm_dao: RealmDao = container.get(RealmDao)
     scope_dao: ScopeDao = container.get(ScopeDao)
     role_dao: RoleDao = container.get(RoleDao)
     user_dao: UserDao = container.get(UserDao)
+    client_dao: ClientDao = container.get(ClientDao)
+    policy_dao: PolicyDao = container.get(PolicyDao)
 
     for realm in main_config.realms:
         realm_dao.add(realm)
@@ -60,6 +45,40 @@ def restore_from_main_config(main_config: MainConfig):
 
         for client in realm.clients:
             client.realm_id = realm.id
+            client_dao.add(client)
 
         for policy in realm.policies:
             policy.realm_id = realm.id
+            policy_dao.add(policy)
+
+
+def export_snapshot(realm_ids: Optional[List[str]] = None) -> MainConfig:
+    realm_dao: RealmDao = container.get(RealmDao)
+    scope_dao: ScopeDao = container.get(ScopeDao)
+    role_dao: RoleDao = container.get(RoleDao)
+    user_dao: UserDao = container.get(UserDao)
+    client_dao: ClientDao = container.get(ClientDao)
+    policy_dao: PolicyDao = container.get(PolicyDao)
+
+    main_config = MainConfig(realms=[])
+
+    realms = (
+        realm_dao.select('id IN :ids OR name IN :ids', dict(ids=realm_ids))
+        if realm_ids
+        else realm_dao.select()
+    )
+
+    for realm in realms:
+        main_config.realms.append(
+            Realm(
+                id=realm.id,
+                name=realm.name,
+                scopes=[i for i in scope_dao.select('realm_id = :realm_id', dict(realm_id=realm.id))],
+                roles=[i for i in role_dao.select('realm_id = :realm_id', dict(realm_id=realm.id))],
+                users=[i for i in user_dao.select('realm_id = :realm_id', dict(realm_id=realm.id))],
+                clients=[i for i in client_dao.select('realm_id = :realm_id', dict(realm_id=realm.id))],
+                policies=[i for i in policy_dao.select('realm_id = :realm_id', dict(realm_id=realm.id))],
+            )
+        )
+
+    return main_config

@@ -1,27 +1,48 @@
+import traceback
 from typing import Optional, Dict, Any, Union, List
 
 from imagination.decorator.config import EnvironmentVariable
 from imagination.decorator.service import Service
 from sqlalchemy import text, Engine, create_engine, Connection, TextClause, bindparam, Result, CursorResult
 
+from midp.log_factory import get_logger_for_object
+
 
 @Service(params=[
     EnvironmentVariable('PSQL_BASE_URL'),
     EnvironmentVariable('PSQL_DBNAME'),
+    EnvironmentVariable('PSQL_VERBOSE',
+                        parse_value=lambda v: (v or '') in ('1', 'true'),
+                        default=False,
+                        allow_default=True),
 ])
 class DataStore:
-    def __init__(self, base_url: str, db_name: str):
-        self._engine: Engine = create_engine(base_url + '/' + db_name, echo=False)
+    def __init__(self, base_url: str, db_name: str, verbose_enabled: bool):
+        self._log = get_logger_for_object(self)
+        self._engine: Engine = create_engine(
+            base_url + '/' + db_name,
+            echo=verbose_enabled,
+        )
 
     def connect(self) -> Connection:
         return self._engine.connect()
 
     def execute_without_result(self,
                                query: str,
-                               parameters: Union[None, List[Dict[str, Any]], Dict[str, Any]] = None):
+                               parameters: Union[None, List[Dict[str, Any]], Dict[str, Any]] = None) -> int:
+        affected_row_count: int = 0
         with self.connect() as c:
-            self._execute(c, query, parameters=parameters)
-            c.commit()
+            try:
+                result = self._execute(c, query, parameters=parameters)
+                # noinspection PyTypeChecker
+                affected_row_count = result.rowcount
+                c.commit()
+            except Exception as e:
+                traceback.print_exc()
+                self._log.warning(f'Initiating the rollback...')
+                c.rollback()
+                self._log.warning(f'Rollback complete')
+        return affected_row_count
 
     def execute(self,
                 query: str,

@@ -10,7 +10,7 @@ from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
 from midp.log_factory import get_logger_for
-from midp.iam.models import Realm
+from midp.models import Realm
 
 
 class MainConfig(BaseModel):

@@ -1,21 +1,24 @@
 import traceback
 from typing import Callable, List, Dict, Any
 from unittest import TestCase
+from uuid import uuid4
 
 import yaml
+from dotenv import load_dotenv
 
 from midp.app.web_client import MiniIDP, ClientOutput
 from midp.common.env_helpers import optional_env
 from midp.config import MainConfig
+from midp.models import Realm
 
 
-class TestingConfig:
+class TestConfig:
     TEST_BASE_URL = optional_env('TEST_BASE_URL', 'http://localhost:8081/')
 
     # Load the test configuration.
     with open(optional_env('TEST_CONFIG_FILE_PATH', 'config-auto-testing.yml'), 'r') as f:
-        TEST_CONFIG: MainConfig = MainConfig(**yaml.load(f.read(), Loader=yaml.SafeLoader))
-    TEST_REALM_NAMES = [r.name for r in TEST_CONFIG.realms]
+        TEST_BASE_CONFIG: MainConfig = MainConfig(**yaml.load(f.read(), Loader=yaml.SafeLoader))
+    TEST_REALM_NAMES = [r.name for r in TEST_BASE_CONFIG.realms]
 
 
 class _ClientOutput(ClientOutput):
@@ -62,12 +65,24 @@ class GenericDeferrableFeature:
 
 
 class GenericAppFeature(GenericDeferrableFeature, TestCase):
+    _env_loaded: bool = False
+
     @classmethod
     def setUpClass(cls):
+        if not cls._env_loaded:
+            load_dotenv()
+            cls._env_loaded = True
+
+        cls._test_realm_id = str(uuid4())
+        cls._test_config = TestConfig.TEST_BASE_CONFIG.model_copy()
+        cls._test_config.realms[0].id = cls._test_realm_id
+        cls._test_config.realms[0].name = f'auto-testing-{cls._test_realm_id}'
+        cls._test_realm = cls._test_config.realms[0]
+
         cls._client_output = _ClientOutput()
-        cls._client = MiniIDP(TestingConfig.TEST_BASE_URL, output=cls._client_output)
-        cls._client.restore(TestingConfig.TEST_CONFIG)
-        cls.defer_after_all(cls._remove_test_realms)
+        cls._client = MiniIDP(TestConfig.TEST_BASE_URL, output=cls._client_output)
+        cls._client.restore(cls._test_config)
+        cls.defer_after_all(lambda: cls._client.rest_realms.delete(cls._test_realm_id))
 
     @classmethod
     def tearDownClass(cls):
@@ -75,17 +90,3 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
 
     def tearDown(self):
         self._run_method_deferred_operations()
-
-    @classmethod
-    def _remove_test_realms(cls):
-        realms = cls._client.rest_realms.list()
-
-        for realm in realms:
-            if realm.name not in TestingConfig.TEST_REALM_NAMES:
-                continue
-
-            try:
-                cls._client.rest_realms.delete(realm.id)
-            except AssertionError as e:
-                print(f'❌ NOT DELETED: {realm} (ERROR)')
-                traceback.print_exc()

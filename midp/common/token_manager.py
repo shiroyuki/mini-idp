@@ -9,7 +9,8 @@ from midp.common.enigma import Enigma
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
-from midp.iam.models import IAMPolicySubject, Realm
+from midp.iam.models import IAMPolicySubject
+from midp.models import Realm
 from midp.static_info import access_token_ttl, refresh_token_ttl
 
 

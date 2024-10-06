@@ -8,8 +8,9 @@ from requests import Response
 
 from midp.config import MainConfig
 from midp.log_factory import get_logger_for, get_logger_for_object
-from midp.iam.models import Realm, OpenIDConfiguration, PredefinedScope, GrantType
-from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse
+from midp.iam.models import PredefinedScope
+from midp.models import Realm, GrantType
+from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
 
 T = TypeVar('T')
 

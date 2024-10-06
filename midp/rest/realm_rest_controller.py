@@ -1,51 +1,16 @@
-from typing import TypeVar, Generic, List
+from typing import List
 
-from fastapi import HTTPException
 from imagination.decorator.service import Service
 
-from midp.common.web_helpers import make_generic_json_response
-from midp.iam.dao.atomic import AtomicDao
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.realm import RealmDao
 from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
-from midp.iam.models import Realm, IAMPolicy, OAuthClient, IAMRole, IAMScope, IAMUser
-
-TypeParameter = TypeVar('TypeParameter')
-
-
-class BaseRestController(Generic[TypeParameter]):
-    _dao: AtomicDao[TypeParameter]
-
-    def list(self) -> List[TypeParameter]:
-        """ List resources """
-        return [i for i in self._dao.select()]
-
-    def create(self, obj: TypeParameter) -> TypeParameter:
-        """ Create a new resource """
-        return self._dao.add(obj)
-
-    def get(self, id: str) -> TypeParameter:
-        """ Get the resource by ID """
-        return self._dao.select('id = :id_or_name OR name = :id_or_name',
-                                dict(id_or_name=id)
-                                )
-
-    def patch(self, id: str, obj: TypeParameter) -> TypeParameter:
-        raise HTTPException(405)
-
-    def put(self, id: str, obj: TypeParameter) -> TypeParameter:
-        raise HTTPException(405)
-
-    def delete(self, id: str):
-        """ Delete the resource by ID """
-        if self._dao.delete('id = :id_or_name OR name = :id_or_name',
-                            dict(id_or_name=id)) > 0:
-            return make_generic_json_response(200)
-        else:
-            return make_generic_json_response(410)
+from midp.iam.models import IAMPolicy, IAMOAuthClient, IAMRole, IAMScope, IAMUser
+from midp.models import Realm
+from midp.common.base_rest_controller import BaseRestController
 
 
 @Service()
@@ -101,25 +66,25 @@ class PolicyRestController(BaseRestController[IAMPolicy]):
 
 
 @Service()
-class ClientRestController(BaseRestController[OAuthClient]):
+class ClientRestController(BaseRestController[IAMOAuthClient]):
     def __init__(self, dao: ClientDao):
         self._dao = dao
 
     # The repeat here is just for FastAPI's method reflection.
 
-    def list(self) -> List[OAuthClient]:
+    def list(self) -> List[IAMOAuthClient]:
         return super().list()
 
-    def create(self, obj: OAuthClient) -> OAuthClient:
+    def create(self, obj: IAMOAuthClient) -> IAMOAuthClient:
         return super().create(obj)
 
-    def get(self, id: str) -> OAuthClient:
+    def get(self, id: str) -> IAMOAuthClient:
         return super().get(id)
 
-    def patch(self, id: str, obj: OAuthClient) -> OAuthClient:
+    def patch(self, id: str, obj: IAMOAuthClient) -> IAMOAuthClient:
         return super().patch(id, obj)
 
-    def put(self, id: str, obj: OAuthClient) -> OAuthClient:
+    def put(self, id: str, obj: IAMOAuthClient) -> IAMOAuthClient:
         return super().put(id, obj)
 
     def delete(self, id: str):

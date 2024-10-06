@@ -1,21 +1,6 @@
-from typing import Any, Dict, List, Optional, Set
-from urllib.parse import urljoin
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field
-
-
-class GrantType:
-    # The authorization flow
-    AUTHORIZATION = 'authorization'
-
-    # The client-credentials flow
-    CLIENT_CREDENTIALS = 'client_credentials'
-
-    # The device-code flow
-    DEVICE_CODE = 'urn:ietf:params:oauth:grant-type:device_code'
-
-    # The on-behalf-of flow
-    IMPERSONATION = 'urn:ietf:params:oauth:grant-type:jwt-bearer'
 
 
 class IAMScope(BaseModel):
@@ -45,8 +30,6 @@ class PredefinedScope:
     OFFLINE_ACCESS = IAMScope.predefined('offline_access', 'Offline Access', sensitive=True)  # for the device-code flow
 
     # Non-standard scopes
-
-    ROOT_ADMIN = IAMScope.predefined('root:admin', 'Root Administrator')  # for direct access to all APIs for all realms
     REALM_ADMIN = IAMScope.predefined('realm:admin',
                                       'Realm Administrator')  # for direct access to all APIs for one specific realm
     USER_READ = IAMScope.predefined('user.read',
@@ -80,7 +63,7 @@ class IAMUser(BaseModel):
     roles: List[str] = Field(default_factory=list)  # Role URNs # Auxiliary Property: Augmented
 
 
-class ReadOnlyIAMUser(BaseModel):
+class IAMUserReadOnly(BaseModel):
     id: str = None
     realm_id: Optional[str] = None  # Hidden Property
     name: str
@@ -100,7 +83,7 @@ class ReadOnlyIAMUser(BaseModel):
         )
 
 
-class OAuthClient(BaseModel):
+class IAMOAuthClient(BaseModel):
     __tbl__ = 'client'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
@@ -113,6 +96,32 @@ class OAuthClient(BaseModel):
     scopes: List[str] = Field(default_factory=list)  # Scope limiter
     extras: Dict[str, Any] = Field(default_factory=dict)
     description: Optional[str] = None
+
+
+class IAMOAuthClientReadOnly(BaseModel):
+    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    realm_id: Optional[str] = None  # Hidden Property
+    name: str
+    audience: str
+    grant_types: List[str]
+    response_types: List[str] = Field(default_factory=list)
+    scopes: List[str] = Field(default_factory=list)  # Scope limiter
+    extras: Dict[str, Any] = Field(default_factory=dict)
+    description: Optional[str] = None
+
+    @classmethod
+    def build_from(cls, client: IAMOAuthClient):
+        return cls(
+            id=client.id,
+            realm_id=client.realm_id,
+            name=client.name,
+            audience=client.audience,
+            grant_types=client.grant_types,
+            response_types=client.response_types,
+            scopes=client.scopes,
+            extras=client.extras,
+            description=client.description,
+        )
 
 
 class IAMPolicySubject(BaseModel):
@@ -129,51 +138,3 @@ class IAMPolicy(BaseModel):
     resource: str
     subjects: List[IAMPolicySubject]
     scopes: List[str]
-
-
-class Realm(BaseModel):
-    __tbl__ = 'realm'
-
-    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    name: str
-    scopes: List[IAMScope] = Field(default_factory=list)  # Auxiliary Property: Augmented
-    roles: List[IAMRole] = Field(default_factory=list)  # Auxiliary Property: Augmented
-    users: List[IAMUser] = Field(default_factory=list)  # Auxiliary Property: Augmented
-    clients: List[OAuthClient] = Field(default_factory=list)  # Auxiliary Property: Augmented
-    policies: List[IAMPolicy] = Field(default_factory=list)  # Auxiliary Property: Augmented
-
-
-class OpenIDConfiguration(BaseModel):
-    issuer: Optional[str] = None
-    authorization_endpoint: Optional[str] = None
-    device_authorization_endpoint: Optional[str] = None
-    token_endpoint: Optional[str] = None
-    introspection_endpoint: Optional[str] = None
-    userinfo_endpoint: Optional[str] = None
-    end_session_endpoint: Optional[str] = None
-    jwks_uri: Optional[str] = None
-    grant_types_supported: Optional[List[str]] = None
-    response_types_supported: Optional[List[str]] = None
-    scopes_supported: Optional[List[str]] = None
-
-    @classmethod
-    def make(cls, base_url: str, realm: Realm):
-        realm_base_url = urljoin(base_url, f'realms/{realm.name}/')
-
-        scopes: Set[str] = set()
-        for policy in realm.policies:
-            scopes.update(policy.scopes)
-
-        return cls(
-            issuer=realm_base_url,
-            authorization_endpoint=None,  # urljoin(realm_base_url, f'auth'),
-            device_authorization_endpoint=urljoin(realm_base_url, f'device'),
-            token_endpoint=urljoin(realm_base_url, f'token'),
-            introspection_endpoint=None,  # urljoin(realm_base_url, f'introspection'),
-            userinfo_endpoint=None,  # urljoin(realm_base_url, f'userinfo'),
-            end_session_endpoint=None,  # urljoin(realm_base_url, f'logout'),
-            jwks_uri=None,  # urljoin(realm_base_url, f'certs'),
-            grant_types_supported=sorted({policy.grant_type for policy in realm.policies}),
-            response_types_supported=sorted({policy.response_type for policy in realm.policies}),
-            scopes_supported=sorted(scopes),
-        )

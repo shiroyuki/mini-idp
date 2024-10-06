@@ -11,7 +11,7 @@ from starlette.responses import Response
 from midp.common.renderer import TemplateRenderer
 from midp.common.session_manager import SessionManager, Session
 from midp.iam.dao.realm import RealmDao
-from midp.iam.models import Realm
+from midp.models import Realm
 
 
 class GenericResponse(BaseModel):

@@ -3,14 +3,15 @@ from urllib.parse import urlparse
 
 import requests
 
-from midp.iam.models import Realm, GrantType, OAuthClient
-from tests.common.base_feature import GenericAppFeature, TestingConfig
+from midp.iam.models import IAMOAuthClient
+from midp.models import Realm, GrantType
+from tests.common.base_feature import GenericAppFeature, TestConfig
 
 
 class E2ETest(GenericAppFeature):
     def test_happy_path(self):
-        realm: Realm = self._get_testing_realm()
-        client: OAuthClient = self._get_testing_client()
+        realm: Realm = self._test_realm
+        client: IAMOAuthClient = self._get_testing_client()
 
         def handle_activation(context: Dict[str, Any]):
             parsed_url = urlparse(context['verification_uri'])
@@ -26,14 +27,6 @@ class E2ETest(GenericAppFeature):
         realm_oauth = self._client.realm(realm.name)
         realm_oauth.initiate_device_code(client.name)
 
-    def _get_testing_realm(self) -> Realm:
-        for realm in TestingConfig.TEST_CONFIG.realms:
-            for client in realm.clients:
-                if GrantType.DEVICE_CODE in client.grant_types:
-                    return realm
-
-        raise RuntimeError('No realm suitable for the test')
-
     def _get_testing_client(self):
-        realm: Realm = self._get_testing_realm()
+        realm: Realm = self._test_realm
         return [client for client in realm.clients if GrantType.DEVICE_CODE in client.grant_types][0]

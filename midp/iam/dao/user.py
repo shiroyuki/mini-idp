@@ -12,56 +12,43 @@ from midp.rds import DataStore
 @Service()
 class UserDao(AtomicDao[IAMUser]):
     def __init__(self, datastore: DataStore, role_dao: RoleDao, enigma: Enigma):
-        super().__init__(datastore, IAMUser.__tbl__)
+        super().__init__(datastore, IAMUser, IAMUser.__tbl__)
         self._role_dao = role_dao
+
         self._enigma = enigma
+
+        self.column('id') \
+            .column('realm_id') \
+            .column('name') \
+            .column('password', 'encrypted_password',
+                    convert_to_sql_data=lambda v: self._enigma.encrypt(v).decode(),
+                    convert_to_property_data=lambda v: self._enigma.decrypt(v).decode()) \
+            .column('email') \
+            .column('full_name')
 
     def get(self, realm_id: str, id: str) -> IAMUser:
         return self.select_one('realm_id = :realm_id AND (id = :id OR name = :id OR email = :id)',
                                dict(realm_id=realm_id, id=id))
 
     def map_row(self, row: Dict[str, Any]) -> IAMUser:
-        user = IAMUser(
-            id=row['id'],
-            realm_id=row['realm_id'],
-            name=row['name'],
-            password=self._enigma.decrypt(row['hashed_password']).decode(),
-            email=row['email'],
-            full_name=row['full_name'],
-            roles=self._get_roles_for(row['id']),
-        )
+        user: IAMUser = super().map_row(row)
+        user.roles.extend(self._get_roles_for(user.id))
         return user
 
     # @override # for Python 3.12
     def add(self, obj: IAMUser) -> IAMUser:
-        query = f"""
-                INSERT INTO {self._table_name} (id, realm_id, name, hashed_password, password_salt, email, full_name)
-                VALUES (:id, :realm_id, :name, :hashed_password, :password_salt, :email, :full_name)
-                """.strip()
+        user: IAMUser = super().add(obj)
 
-        parameters = {
-            "id": obj.id,
-            "realm_id": obj.realm_id,
-            "name": obj.name,
-            "hashed_password": self._enigma.encrypt(obj.password).decode(),
-            "password_salt": '',  # TODO Generate the partial salt
-            "email": obj.email,
-            "full_name": obj.full_name,
-        }
-
-        if self._datastore.execute_without_result(query, parameters) == 0:
-            raise InsertError(obj)
-
-        if obj.roles:
+        if user.roles:
             parameter_set: List[Dict[str, Any]] = []
 
             roles = self._role_dao.select(
                 'realm_id = :realm_id AND (id IN :id_list OR name IN (:id_list))',
-                dict(realm_id=obj.realm_id, id_list=obj.roles)
+                dict(realm_id=user.realm_id, id_list=user.roles)
             )
 
             for role in roles:
-                parameter_set.append(dict(user_id=obj.id, role_id=role.id))
+                parameter_set.append(dict(user_id=user.id, role_id=role.id))
 
             additional_insertions = """
                 INSERT INTO iam_user_role (user_id, role_id)
@@ -69,9 +56,9 @@ class UserDao(AtomicDao[IAMUser]):
             """
 
             if self._datastore.execute_without_result(additional_insertions, parameter_set) == 0:
-                raise InsertError(obj)
+                raise InsertError(user)
 
-        return obj
+        return user
 
     def _get_roles_for(self, user_id: str) -> List[str]:
         query = f"""

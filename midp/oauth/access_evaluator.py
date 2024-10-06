@@ -6,7 +6,7 @@ from imagination.decorator.service import Service
 
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.realm import RealmDao
-from midp.iam.models import OAuthClient
+from midp.iam.models import IAMOAuthClient
 
 
 @Service()
@@ -23,7 +23,7 @@ class AccessEvaluator:
             raise HTTPException(404)
 
         client_dao: ClientDao = self._client_dao
-        client: OAuthClient = await asyncio.to_thread(
+        client: IAMOAuthClient = await asyncio.to_thread(
             client_dao.select_one,
             ' AND '.join([
                 'realm_id = :realm_id',

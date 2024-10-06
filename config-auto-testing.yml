@@ -1,5 +1,5 @@
 realms:
-  - name: auto-testing-a
+  - name: auto-testing
     scopes:
       - name: scope_a
       - name: scope_b
@@ -99,14 +99,3 @@ realms:
           - 'user.read'  # NOTE: Copied from MS Docs
           # App-specific Scopes
           - 'scope_b'
-  - name: auto-testing-b
-    scopes:
-      - name: scope_a
-      - name: scope_b
-        sensitive: true
-    roles:
-      - name: role_a
-      - name: role_2
-    users: []
-    clients: []
-    policies: []

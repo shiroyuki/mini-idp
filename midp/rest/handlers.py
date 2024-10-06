@@ -3,9 +3,10 @@ from typing import TypeVar, Type, List
 from fastapi import APIRouter
 from imagination import container
 
-from midp.iam.models import Realm
-from midp.rest.data_service import BaseRestController, RealmRestController, UserRestController, ScopeRestController, \
-    RoleRestController, PolicyRestController, ClientRestController
+from midp.models import Realm
+from midp.common.base_rest_controller import BaseRestController
+from midp.rest.realm_rest_controller import RealmRestController, PolicyRestController, ClientRestController, \
+    RoleRestController, ScopeRestController, UserRestController
 
 T = TypeVar('T')
 
@@ -40,23 +41,3 @@ rest_realm_router = create_router('realms', Realm, RealmRestController)
 rest_role_router = create_router('roles', Realm, RoleRestController)
 rest_scope_router = create_router('scopes', Realm, ScopeRestController)
 rest_user_router = create_router('users', Realm, UserRestController)
-
-
-# rest_realm_router = APIRouter(
-#     prefix=r'/rest/realms',
-#     tags=['rest:realms'],
-#     responses={
-#         401: dict(error='not-authenticated'),
-#         403: dict(error='access-denied'),
-#         404: dict(error='job-not-found'),
-#         405: dict(error='method-not-allowed'),
-#         410: dict(error='gone'),
-#     }
-# )
-#
-# controller = RestController(Realm, container.get(RealmDao))
-#
-# rest_realm_router.get('/')(controller.list)
-# rest_realm_router.post('/')(controller.create)
-# rest_realm_router.get('/{id_or_name}')(controller.get)
-# rest_realm_router.delete('/{id_or_name}')(controller.delete)

@@ -16,10 +16,11 @@ from midp.common.session_manager import Session
 from midp.common.token_manager import RealmTokenManager, TokenSet, RealmTokenGenerationError
 from midp.common.web_helpers import respond_html, get_basic_template_variables, restore_session, web_path_get_realm
 from midp.iam.dao.realm import RealmDao
-from midp.iam.models import OpenIDConfiguration, GrantType, PredefinedScope, IAMPolicySubject, Realm
+from midp.iam.models import PredefinedScope, IAMPolicySubject
+from midp.models import Realm, GrantType
 from midp.oauth.access_evaluator import AccessEvaluator
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
-    DeviceAuthorizationRequest, DeviceAuthorizationResponse
+    DeviceAuthorizationRequest, DeviceAuthorizationResponse, OpenIDConfiguration, LoginResponse
 from midp.oauth.user_authenticator import UserAuthenticator, AuthenticationResult, AuthenticationError
 from midp.static_info import verification_ttl
 
@@ -53,23 +54,16 @@ async def prompt_for_signing_in(request: Request,
 
 @oauth_router.post(r'/{realm_id}/login')
 async def sign_in(request: Request,
+                  response: Response,
                   realm_id: str,
                   username: Annotated[str, Form()],
                   password: Annotated[str, Form()],
                   session: Annotated[Session, Depends(restore_session)],
-                  realm: Annotated[Realm, Depends(web_path_get_realm)]):
+                  realm: Annotated[Realm, Depends(web_path_get_realm)]) -> LoginResponse:
     if request.headers.get("accept") == 'application/json':
-        session_user = session.data.get('user')
+        session_user = session.data.get('realm_user')
 
-        response_body = {
-            'error': None,
-            'error_description': None,
-            'session_id': session.id,
-            'user': session_user,
-            'already_exists': session_user is not None,
-        }
-
-        print(realm)
+        response_body = LoginResponse(already_exists=session_user is not None)
 
         if not session_user:
             user_auth: UserAuthenticator = container.get(UserAuthenticator)
@@ -85,10 +79,13 @@ async def sign_in(request: Request,
                 session.data['realm_refresh_token'] = result.refresh_token
                 await asyncio.to_thread(session.save)
 
-                response_body['principle'] = result.principle
+                response.set_cookie('sid', session.encrypted_id)
+                response_body.session_id = session.id
+                response_body.principle = result.principle
             except AuthenticationError as e:
-                response_body['error'] = e.code
-                response_body['error_description'] = e.description
+                response.status_code = 400
+                response_body.error = e.code
+                response_body.error_description = e.description
 
         return response_body
     else:

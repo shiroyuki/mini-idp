@@ -5,11 +5,12 @@ from imagination.decorator.service import Service
 from pydantic import BaseModel
 
 from midp.iam.dao.user import UserDao
-from midp.iam.models import Realm, ReadOnlyIAMUser
+from midp.iam.models import IAMUserReadOnly
+from midp.models import Realm
 
 
 class AuthenticationResult(BaseModel):
-    principle: ReadOnlyIAMUser
+    principle: IAMUserReadOnly
     access_token: str
     refresh_token: str
 
@@ -33,12 +34,11 @@ class UserAuthenticator:
         self._user_dao = user_dao
 
     def authenticate(self, username: str, password: str, *, realm: Optional[Realm] = None) -> AuthenticationResult:
-        sleep(5)
         user = self._user_dao.get(realm.id, username)
 
         if user and user.password == password:
             return AuthenticationResult(
-                principle=ReadOnlyIAMUser.build_from(user),
+                principle=IAMUserReadOnly.build_from(user),
                 access_token='',
                 refresh_token='',
             )

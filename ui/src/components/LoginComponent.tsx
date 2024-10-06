@@ -65,7 +65,7 @@ const LoginComponent: React.FC<LoginComponentProps> = ({ realmId }) => {
     postData.append('username', formData.username);
 
     const response = await fetch(
-      `/realms/${realmId}/login`,
+      realmId ? `/realms/${realmId}/login` : '/root/login',
       {
         method: 'post',
         headers: { 'Accept': 'application/json' },

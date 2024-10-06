@@ -6,6 +6,10 @@ The Mini Identity Provider for Local Development and Testing
 
 * Provide the bare-bone compatibility with OAuth2 standards (authorization flow, device code flow, client credentials flow).
 
+(Future)
+
+* OTP Support
+
 ## Requirements
 
 * Python 3.9 or newer
@@ -26,6 +30,7 @@ Run the SQL scripts in `migrations/` in the alphanumeric order.
 ```shell
 psql "postgres://shiroyuki:no-secret@localhost:5432/postgres" -c "CREATE DATABASE miniidp"
 psql "postgres://shiroyuki:no-secret@localhost:5432/miniidp" -v ON_ERROR_STOP=1 -f migrations/001-init.sql
+psql "postgres://shiroyuki:no-secret@localhost:5432/miniidp" -v ON_ERROR_STOP=1 -f migrations/002-add-system-entities.sql
 ```
 
 ### Signing Keys

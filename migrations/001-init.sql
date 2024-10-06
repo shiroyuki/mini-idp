@@ -35,8 +35,7 @@ CREATE TABLE iam_user (
   id VARCHAR PRIMARY KEY,
   realm_id VARCHAR NOT NULL,
   name VARCHAR NOT NULL,
-  hashed_password VARCHAR NOT NULL,
-  password_salt VARCHAR NOT NULL,
+  encrypted_password VARCHAR NOT NULL,
   email VARCHAR NOT NULL,
   full_name VARCHAR,
   FOREIGN KEY (realm_id) REFERENCES realm (id) ON DELETE CASCADE

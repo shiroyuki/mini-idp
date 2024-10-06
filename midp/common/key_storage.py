@@ -8,7 +8,7 @@ from imagination.decorator.service import Service
 
 from midp.iam.dao.realm import RealmDao
 from midp.log_factory import get_logger_for
-from midp.iam.models import Realm
+from midp.models import Realm
 from midp.rds import DataStore
 
 

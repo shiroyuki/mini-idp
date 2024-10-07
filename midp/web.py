@@ -1,3 +1,5 @@
+from urllib.parse import urljoin
+
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
@@ -5,9 +7,9 @@ from starlette.staticfiles import StaticFiles
 
 from midp import static_info
 from midp.oauth.handler import oauth_router
+from midp.oauth.models import OpenIDConfiguration
 from midp.recovery.handler import recovery_router
-from midp.rest.handlers import rest_realm_router, rest_client_router, rest_policy_router, rest_role_router, \
-    rest_scope_router, rest_user_router
+from midp.rest.handlers import rest_routers
 
 app = FastAPI(title=static_info.name, version=static_info.version)
 
@@ -30,19 +32,16 @@ def release_information():
     return Response('', status_code=200, headers={'Content-type': 'text/plain'})
 
 
+@app.get(r'/.well-known/openid-configuration', response_model_exclude_defaults=True)
+async def get_openid_configuration(request: Request) -> OpenIDConfiguration:
+    base_url = str(request.base_url)
+
+    return OpenIDConfiguration.make(urljoin(base_url, 'oauth/'))
+
+
 app.include_router(oauth_router)
 app.include_router(recovery_router)
-app.include_router(rest_client_router)
-app.include_router(rest_policy_router)
-app.include_router(rest_realm_router)
-app.include_router(rest_role_router)
-app.include_router(rest_scope_router)
-app.include_router(rest_user_router)
-
-# TODO Deprecate this for React app
-app.mount("/public",
-          StaticFiles(directory=static_info.static_file_path),
-          name="static")
+[app.include_router(router) for router in rest_routers]
 
 app.mount("/",
           StaticFiles(directory=static_info.web_ui_file_path, html=True),

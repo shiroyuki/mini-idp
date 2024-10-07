@@ -7,7 +7,6 @@ class IAMScope(BaseModel):
     __tbl__ = 'iam_scope'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     description: Optional[str] = None
     sensitive: bool = False
@@ -30,9 +29,9 @@ class PredefinedScope:
     OFFLINE_ACCESS = IAMScope.predefined('offline_access', 'Offline Access', sensitive=True)  # for the device-code flow
 
     # Non-standard scopes
-    REALM_ADMIN = IAMScope.predefined('realm:admin',
+    SYS_ADMIN = IAMScope.predefined('system.admin',
                                       'Realm Administrator')  # for direct access to all APIs for one specific realm
-    USER_READ = IAMScope.predefined('user.read',
+    IMPERSONATION = IAMScope.predefined('user.impersonation',
                                     'Read Access to User Profile')  # for an OAuth2 to impersonate as a user
 
 
@@ -46,7 +45,6 @@ class IAMRole(BaseModel):
     __tbl__ = 'iam_role'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     description: Optional[str] = None
 
@@ -55,7 +53,6 @@ class IAMUser(BaseModel):
     __tbl__ = 'iam_user'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     password: Optional[str]  # Auxiliary Property: Decrypted
     email: str
@@ -65,7 +62,6 @@ class IAMUser(BaseModel):
 
 class IAMUserReadOnly(BaseModel):
     id: str = None
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     email: str
     full_name: Optional[str] = None
@@ -75,7 +71,6 @@ class IAMUserReadOnly(BaseModel):
     def build_from(cls, user: IAMUser):
         return cls(
             id=user.id,
-            realm_id=user.realm_id,
             name=user.name,
             email=user.email,
             full_name=user.full_name,
@@ -84,10 +79,9 @@ class IAMUserReadOnly(BaseModel):
 
 
 class IAMOAuthClient(BaseModel):
-    __tbl__ = 'client'
+    __tbl__ = 'iam_client'
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     secret: Optional[str] = None  # Auxiliary Property: Decrypted
     audience: str
@@ -100,7 +94,6 @@ class IAMOAuthClient(BaseModel):
 
 class IAMOAuthClientReadOnly(BaseModel):
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
-    realm_id: Optional[str] = None  # Hidden Property
     name: str
     audience: str
     grant_types: List[str]
@@ -113,7 +106,6 @@ class IAMOAuthClientReadOnly(BaseModel):
     def build_from(cls, client: IAMOAuthClient):
         return cls(
             id=client.id,
-            realm_id=client.realm_id,
             name=client.name,
             audience=client.audience,
             grant_types=client.grant_types,
@@ -134,7 +126,6 @@ class IAMPolicy(BaseModel):
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
     name: str
-    realm_id: Optional[str] = None  # Hidden Property
     resource: str
     subjects: List[IAMPolicySubject]
     scopes: List[str]

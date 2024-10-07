@@ -2,11 +2,8 @@ from typing import Optional, List, Set, Union
 from urllib.parse import urljoin
 
 from pydantic import BaseModel, ConfigDict
-from uvicorn import Config
 
 from midp.iam.models import IAMUserReadOnly
-from midp.models import Realm
-from midp.root.models import RootUserReadOnly
 from midp.static_info import verification_ttl
 
 
@@ -18,7 +15,7 @@ class GenericOAuthResponse(BaseModel):
 
 
 class LoginResponse(GenericOAuthResponse):
-    principle: Union[RootUserReadOnly, IAMUserReadOnly, None] = None
+    principle: Optional[IAMUserReadOnly] = None
     session_id: Optional[str] = None
     already_exists: Optional[bool] = None
 
@@ -81,23 +78,14 @@ class OpenIDConfiguration(BaseModel):
     scopes_supported: Optional[List[str]] = None
 
     @classmethod
-    def make(cls, base_url: str, realm: Realm):
-        realm_base_url = urljoin(base_url, f'realms/{realm.name}/')
-
-        scopes: Set[str] = set()
-        for policy in realm.policies:
-            scopes.update(policy.scopes)
-
+    def make(cls, base_url: str):
         return cls(
-            issuer=realm_base_url,
+            issuer=base_url,
             authorization_endpoint=None,  # urljoin(realm_base_url, f'auth'),
-            device_authorization_endpoint=urljoin(realm_base_url, f'device'),
-            token_endpoint=urljoin(realm_base_url, f'token'),
+            device_authorization_endpoint=urljoin(base_url, f'device'),
+            token_endpoint=urljoin(base_url, f'token'),
             introspection_endpoint=None,  # urljoin(realm_base_url, f'introspection'),
             userinfo_endpoint=None,  # urljoin(realm_base_url, f'userinfo'),
             end_session_endpoint=None,  # urljoin(realm_base_url, f'logout'),
             jwks_uri=None,  # urljoin(realm_base_url, f'certs'),
-            grant_types_supported=sorted({policy.grant_type for policy in realm.policies}),
-            response_types_supported=sorted({policy.response_type for policy in realm.policies}),
-            scopes_supported=sorted(scopes),
         )

@@ -30,7 +30,17 @@ Run the SQL scripts in `migrations/` in the alphanumeric order.
 ```shell
 psql "postgres://shiroyuki:no-secret@localhost:5432/postgres" -c "CREATE DATABASE miniidp"
 psql "postgres://shiroyuki:no-secret@localhost:5432/miniidp" -v ON_ERROR_STOP=1 -f migrations/001-init.sql
-psql "postgres://shiroyuki:no-secret@localhost:5432/miniidp" -v ON_ERROR_STOP=1 -f migrations/002-add-system-entities.sql
+```
+
+#### How to reset the system
+
+```sql
+DELETE FROM iam_scope WHERE id IS NOT NULL;
+DELETE FROM iam_role WHERE id IS NOT NULL;
+DELETE FROM iam_user WHERE id IS NOT NULL;
+DELETE FROM iam_client WHERE id IS NOT NULL;
+DELETE FROM iam_policy WHERE id IS NOT NULL;
+DELETE FROM kv WHERE k IS NOT NULL;
 ```
 
 ### Signing Keys

@@ -10,7 +10,6 @@ from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject
-from midp.models import Realm
 from midp.static_info import access_token_ttl, refresh_token_ttl
 
 
@@ -43,12 +42,12 @@ class RootTokenManager:
         )
 
 
-class RealmTokenGenerationError(RuntimeError):
+class TokenGenerationError(RuntimeError):
     pass
 
 
 @Service()
-class RealmTokenManager:
+class UserTokenManager:
     def __init__(self, root_token_manager: RootTokenManager, user_dao: UserDao, policy_dao: PolicyDao,
                  client_dao: ClientDao):
         self._root_token_manager = root_token_manager
@@ -57,41 +56,36 @@ class RealmTokenManager:
         self._client_dao = client_dao
 
     def generate(self,
-                 realm: Realm,
                  subject: IAMPolicySubject,
                  resource_url: str,
                  requested_scopes: List[str]) -> TokenSet:
         subject = subject.subject
 
-        user = self._user_dao.get(realm.id, subject)
+        user = self._user_dao.get(subject)
 
         if not user:
-            raise RealmTokenGenerationError('access_denied')
+            raise TokenGenerationError('access_denied')
 
         policies = [
             p
             for p in self._policy_dao.select(
-                # 'realm_id = :realm_id',
-
-                'realm_id = :realm_id AND resource = LEFT(:resource_url, LENGTH(resource))',
-                dict(realm_id=realm.id, resource_url=resource_url)
+                'resource = LEFT(:resource_url, LENGTH(resource))',
+                dict(resource_url=resource_url)
             )
         ]
 
         print(f'PANDA: policies = {policies}')
 
         if not policies:
-            raise RealmTokenGenerationError('access_denied')
+            raise TokenGenerationError('access_denied')
 
         current_time = time()
 
-        access_claims = dict(realm=realm.id,
-                             sub=subject,
+        access_claims = dict(sub=subject,
                              scope=' '.join(requested_scopes),
                              aud=resource_url,
                              exp=current_time + access_token_ttl)
-        refresh_claims = dict(realm=realm.id,
-                              sub=subject,
+        refresh_claims = dict(sub=subject,
                               scope='openid refresh',
                               aud=resource_url,
                               exp=current_time + (access_token_ttl * 7))

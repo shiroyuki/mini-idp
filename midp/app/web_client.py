@@ -8,8 +8,8 @@ from requests import Response
 
 from midp.config import MainConfig
 from midp.log_factory import get_logger_for, get_logger_for_object
-from midp.iam.models import PredefinedScope
-from midp.models import Realm, GrantType
+from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
+from midp.models import GrantType
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
 
 T = TypeVar('T')
@@ -75,29 +75,80 @@ class ClientOutput:
         sys.stderr.write(template.format(**context) + '\n')
 
 
-class RealmOAuthClient:
-    def __init__(self, name: str, base_url: str, output: Optional[ClientOutput] = None):
-        self._log = get_logger_for(f'Realm:{name}')
-        self._name = name
-        self._base_url = base_url
-        self._output = output
+class MiniIDP:
+    def __init__(self, base_url: str, output: Optional[ClientOutput] = None):
+        self._log = get_logger_for_object(self)
+        self._base_url = base_url.strip()
+        self._output = output or ClientOutput()
+        self._openid_config: Optional[OpenIDConfiguration] = None
+
+        assert self._output, 'No output'
+
+        assert self._base_url, 'The base URL must be defined.'
 
         if not self._base_url.endswith(r'/'):
             self._base_url += '/'
 
-    def get_openid_configuration(self) -> OpenIDConfiguration:
-        response = requests.get(urljoin(self._base_url, '.well-known/openid-configuration'))
+        # REST API Clients
+        self._clients: RestAPIClient[IAMOAuthClient] = RestAPIClient(urljoin(self._base_url, 'rest/clients'),
+                                                                     IAMOAuthClient)
+        self._policies: RestAPIClient[IAMPolicy] = RestAPIClient(urljoin(self._base_url, 'rest/policies'),
+                                                                 IAMPolicy)
+        self._roles: RestAPIClient[IAMRole] = RestAPIClient(urljoin(self._base_url, 'rest/roles'),
+                                                            IAMRole)
+        self._scopes: RestAPIClient[IAMScope] = RestAPIClient(urljoin(self._base_url, 'rest/scopes'),
+                                                              IAMScope)
+        self._users: RestAPIClient[IAMUser] = RestAPIClient(urljoin(self._base_url, 'rest/users'),
+                                                            IAMUser)
+
+    @property
+    def clients(self):
+        return self._clients
+
+    @property
+    def policies(self):
+        return self._policies
+
+    @property
+    def roles(self):
+        return self._roles
+
+    @property
+    def scopes(self):
+        return self._scopes
+
+    @property
+    def users(self):
+        return self._users
+
+    def restore(self, config: MainConfig):
+        response = requests.post(urljoin(self._base_url, 'rpc/recovery/import'),
+                                 json=config.model_dump(mode='python'))
 
         _assert_response(response, [200])
 
-        return OpenIDConfiguration(**response.json())
+    def export(self) -> MainConfig:
+        response = requests.get(urljoin(self._base_url, 'rpc/recovery/export'))
+
+        _assert_response(response, [200])
+
+        return MainConfig(**response.json())
+
+    def get_openid_configuration(self) -> OpenIDConfiguration:
+        if not self._openid_config:
+            response = requests.get(urljoin(self._base_url, '.well-known/openid-configuration'))
+            _assert_response(response, [200])
+            self._openid_config = OpenIDConfiguration(**response.json())
+        return self._openid_config
 
     def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None):
+        openid_config = self.get_openid_configuration()
+
         query_string = ''
         if resource_url:
             query_string = f'?resource={quote_plus(resource_url)}'
 
-        verification_code_response = requests.post(urljoin(self._base_url, 'device') + query_string,
+        verification_code_response = requests.post(openid_config.device_authorization_endpoint + query_string,
                                                    data=dict(client_id=client_id,
                                                              scope=' '.join([PredefinedScope.OPENID.name,
                                                                              PredefinedScope.PROFILE.name,
@@ -127,9 +178,11 @@ class RealmOAuthClient:
         )
 
         while time() - start_time < verification.expires_in:
+            openid_config = self.get_openid_configuration()
+
             sleep(verification_interval)
 
-            token_exchange_response = requests.post(urljoin(self._base_url, 'token'),
+            token_exchange_response = requests.post(openid_config.token_endpoint,
                                                     data=dict(client_id=client_id,
                                                               grant_type=GrantType.DEVICE_CODE,
                                                               device_code=verification.device_code)
@@ -155,37 +208,3 @@ class RealmOAuthClient:
                 raise DeviceAuthorizationTerminated(
                     f'UNEXPECTED: HTTP {token_exchange_response.status_code} {token_exchange_response.text}'
                 )
-
-
-class MiniIDP:
-    def __init__(self, base_url: str, output: Optional[ClientOutput] = None):
-        self._log = get_logger_for_object(self)
-        self._base_url = base_url.strip()
-        self._output = output or ClientOutput()
-
-        assert self._output, 'No output'
-
-        assert self._base_url, 'The base URL must be defined.'
-
-        if not self._base_url.endswith(r'/'):
-            self._base_url += '/'
-
-        # REST API Client
-        self.rest_realms = RestAPIClient(urljoin(self._base_url, 'rest/realms'), Realm)
-
-    def restore(self, config: MainConfig):
-        response = requests.post(urljoin(self._base_url, 'rpc/recovery/import'),
-                                 json=config.model_dump(mode='python'))
-
-        _assert_response(response, [200])
-
-    def export(self, *realm_ids_or_names: str) -> MainConfig:
-        response = requests.post(urljoin(self._base_url, 'rpc/recovery/export'),
-                                 json={'realms': realm_ids_or_names})
-
-        _assert_response(response, [200])
-
-        return MainConfig(**response.json())
-
-    def realm(self, id: str) -> RealmOAuthClient:
-        return RealmOAuthClient(id, urljoin(self._base_url, f'realms/{id}'), self._output)

@@ -3,9 +3,9 @@ from typing import TypeVar, Type, List
 from fastapi import APIRouter
 from imagination import container
 
-from midp.models import Realm
 from midp.common.base_rest_controller import BaseRestController
-from midp.rest.realm_rest_controller import RealmRestController, PolicyRestController, ClientRestController, \
+from midp.iam.models import IAMOAuthClient, IAMPolicy, IAMRole, IAMScope, IAMUser
+from midp.rest.realm_rest_controller import PolicyRestController, ClientRestController, \
     RoleRestController, ScopeRestController, UserRestController
 
 T = TypeVar('T')
@@ -35,9 +35,10 @@ def create_router(resource_type: str, model_class: Type[T], controller_class: Ty
 
     return router
 
-rest_client_router = create_router('clients', Realm, ClientRestController)
-rest_policy_router = create_router('policies', Realm, PolicyRestController)
-rest_realm_router = create_router('realms', Realm, RealmRestController)
-rest_role_router = create_router('roles', Realm, RoleRestController)
-rest_scope_router = create_router('scopes', Realm, ScopeRestController)
-rest_user_router = create_router('users', Realm, UserRestController)
+rest_routers = [
+    create_router('clients', IAMOAuthClient, ClientRestController),
+    create_router('policies', IAMPolicy, PolicyRestController),
+    create_router('roles', IAMRole, RoleRestController),
+    create_router('scopes', IAMScope, ScopeRestController),
+    create_router('users', IAMUser, UserRestController),
+]

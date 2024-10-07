@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMUserReadOnly
-from midp.models import Realm
 
 
 class AuthenticationResult(BaseModel):
@@ -33,8 +32,8 @@ class UserAuthenticator:
     def __init__(self, user_dao: UserDao):
         self._user_dao = user_dao
 
-    def authenticate(self, username: str, password: str, *, realm: Optional[Realm] = None) -> AuthenticationResult:
-        user = self._user_dao.get(realm.id, username)
+    def authenticate(self, username: str, password: str) -> AuthenticationResult:
+        user = self._user_dao.get(username)
 
         if user and user.password == password:
             return AuthenticationResult(

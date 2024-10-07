@@ -4,39 +4,11 @@ from imagination.decorator.service import Service
 
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
-from midp.iam.dao.realm import RealmDao
 from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicy, IAMOAuthClient, IAMRole, IAMScope, IAMUser
-from midp.models import Realm
 from midp.common.base_rest_controller import BaseRestController
-
-
-@Service()
-class RealmRestController(BaseRestController[Realm]):
-    def __init__(self, dao: RealmDao):
-        self._dao = dao
-
-    # The repeat here is just for FastAPI's method reflection.
-
-    def list(self) -> List[Realm]:
-        return super().list()
-
-    def create(self, obj: Realm) -> Realm:
-        return super().create(obj)
-
-    def get(self, id: str) -> Realm:
-        return super().get(id)
-
-    def patch(self, id: str, obj: Realm) -> Realm:
-        return super().patch(id, obj)
-
-    def put(self, id: str, obj: Realm) -> Realm:
-        return super().put(id, obj)
-
-    def delete(self, id: str):
-        return super().delete(id)
 
 
 @Service()

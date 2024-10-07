@@ -10,12 +10,5 @@ class PolicyDao(AtomicDao[IAMPolicy]):
     def __init__(self, datastore: DataStore):
         super().__init__(datastore, IAMPolicy, IAMPolicy.__tbl__)
 
-        self.column('id')\
-            .column('realm_id')\
-            .column('name')\
-            .column_as_json('subjects')\
-            .column('resource')\
-            .column_as_json('scopes')
-
-    def get(self, realm_id: str, id: str) -> IAMPolicy:
-        return self.select_one('realm_id = :realm_id AND (id = :id OR name = :id)', dict(realm_id=realm_id, id=id))
+        self.map_column_as_json('subjects')\
+            .map_column_as_json('scopes')

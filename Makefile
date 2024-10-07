@@ -5,7 +5,8 @@ uv-run:
 	uvicorn midp.web:app --host 0.0.0.0 --port 8081
 
 config-default-json:
-	cat config-default.yml | yq -o json -M
+	@echo "##### conversation-app #####"
+	cat config-conversation-app.yml | yq -o json -M
 
 ui-build:
 	cd ui && npm run build

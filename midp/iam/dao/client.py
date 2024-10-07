@@ -1,3 +1,5 @@
+from typing import Union
+
 from imagination.decorator.service import Service
 
 from midp.common.enigma import Enigma
@@ -13,18 +15,14 @@ class ClientDao(AtomicDao[IAMOAuthClient]):
 
         self._enigma = enigma
 
-        self.column('id')\
-            .column('realm_id')\
-            .column('name')\
-            .column('secret', 'encrypted_secret',
-                    convert_to_sql_data=lambda v: self._enigma.encrypt(v).decode(),
-                    convert_to_property_data=lambda v: self._enigma.decrypt(v).decode())\
-            .column('audience')\
-            .column_as_json('grant_types')\
-            .column_as_json('response_types')\
-            .column_as_json('scopes')\
-            .column_as_json('extras')\
-            .column('description')
+        self.map_column_with_encryption('secret')\
+            .map_column_as_json('grant_types')\
+            .map_column_as_json('response_types')\
+            .map_column_as_json('scopes')\
+            .map_column_as_json('extras')
 
-    def get(self, realm_id: str, id: str) -> IAMOAuthClient:
-        return self.select_one('realm_id = :realm_id AND (id = :id OR name = :id)', dict(realm_id=realm_id, id=id))
+    def _encrypt_data(self, data: Union[bytes, str]) -> str:
+        return self._enigma.encrypt(data).decode()
+
+    def _decrypt_data(self, data: Union[bytes, str]) -> str:
+        return self._enigma.decrypt(data).decode()

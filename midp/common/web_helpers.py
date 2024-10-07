@@ -4,14 +4,11 @@ from typing import Dict, Any, Optional
 
 from imagination import container
 from pydantic import BaseModel
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
 from midp.common.renderer import TemplateRenderer
 from midp.common.session_manager import SessionManager, Session
-from midp.iam.dao.realm import RealmDao
-from midp.models import Realm
 
 
 class GenericResponse(BaseModel):
@@ -61,16 +58,6 @@ def get_basic_template_variables(request: Request) -> Dict[str, Any]:
         base_url=str(request.base_url),
         url=str(request.url),
     )
-
-
-async def web_path_get_realm(request: Request) -> Realm:
-    realm_dao: RealmDao = container.get(RealmDao)
-    realm: Realm = await asyncio.to_thread(realm_dao.get, request.path_params.get('realm_id'))
-
-    if not realm:
-        raise HTTPException(404)
-
-    return realm
 
 
 async def restore_session(request: Request) -> Session:

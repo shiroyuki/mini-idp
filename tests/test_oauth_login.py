@@ -7,12 +7,11 @@ from tests.common.base_feature import GenericAppFeature, TestConfig
 
 
 class E2ETest(GenericAppFeature):
-    def test_realm_login(self):
-        realm = self._test_realm
-        test_user = realm.users[0]
+    def test_login(self):
+        test_user = self._test_config.users[0]
 
         web_session = requests.Session()
-        response: Response = web_session.post(urljoin(TestConfig.TEST_BASE_URL, f'realms/{realm.name}/login'),
+        response: Response = web_session.post(urljoin(TestConfig.TEST_BASE_URL, f'oauth/login'),
                                               headers={'Accept': 'application/json'},
                                               data={'username': test_user.name, 'password': test_user.password})
         self.assertEqual(200, response.status_code)

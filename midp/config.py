@@ -12,7 +12,7 @@ from midp.iam.models import IAMScope, IAMRole, IAMUser, IAMOAuthClient, IAMPolic
 from midp.log_factory import get_logger_for
 
 
-class MainConfig(BaseModel):
+class AppSnapshot(BaseModel):
     version: str = Field(default='1.0.0')
     scopes: List[IAMScope] = Field(default_factory=list)  # Auxiliary Property: Augmented
     roles: List[IAMRole] = Field(default_factory=list)  # Auxiliary Property: Augmented
@@ -21,7 +21,7 @@ class MainConfig(BaseModel):
     policies: List[IAMPolicy] = Field(default_factory=list)  # Auxiliary Property: Augmented
 
 
-def restore_from_snapshot(main_config: MainConfig):
+def restore_from_snapshot(main_config: AppSnapshot):
     scope_dao: ScopeDao = container.get(ScopeDao)
     role_dao: RoleDao = container.get(RoleDao)
     user_dao: UserDao = container.get(UserDao)
@@ -44,14 +44,14 @@ def restore_from_snapshot(main_config: MainConfig):
         policy_dao.add(policy)
 
 
-def export_snapshot() -> MainConfig:
+def export_snapshot() -> AppSnapshot:
     scope_dao: ScopeDao = container.get(ScopeDao)
     role_dao: RoleDao = container.get(RoleDao)
     user_dao: UserDao = container.get(UserDao)
     client_dao: ClientDao = container.get(ClientDao)
     policy_dao: PolicyDao = container.get(PolicyDao)
 
-    return MainConfig(
+    return AppSnapshot(
         scopes=[i for i in scope_dao.select()],
         roles=[i for i in role_dao.select()],
         users=[i for i in user_dao.select()],

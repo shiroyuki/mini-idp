@@ -6,7 +6,7 @@ from urllib.parse import urljoin, quote_plus
 import requests
 from requests import Response
 
-from midp.config import MainConfig
+from midp.config import AppSnapshot
 from midp.log_factory import get_logger_for, get_logger_for_object
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
 from midp.models import GrantType
@@ -121,18 +121,18 @@ class MiniIDP:
     def users(self):
         return self._users
 
-    def restore(self, config: MainConfig):
+    def restore(self, config: AppSnapshot):
         response = requests.post(urljoin(self._base_url, 'rpc/recovery/import'),
                                  json=config.model_dump(mode='python'))
 
         _assert_response(response, [200])
 
-    def export(self) -> MainConfig:
+    def export(self) -> AppSnapshot:
         response = requests.get(urljoin(self._base_url, 'rpc/recovery/export'))
 
         _assert_response(response, [200])
 
-        return MainConfig(**response.json())
+        return AppSnapshot(**response.json())
 
     def get_openid_configuration(self) -> OpenIDConfiguration:
         if not self._openid_config:

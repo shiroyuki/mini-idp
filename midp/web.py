@@ -17,7 +17,7 @@ app = FastAPI(title=static_info.name, version=static_info.version)
 @app.middleware('security')
 async def intercept_request_response(request: Request, call_next):
     response: Response = await call_next(request)
-    response.headers['X-Server'] = f'{static_info.name}/{static_info.version}'
+    response.headers['Server'] = f'{static_info.name}/{static_info.version}'
 
     return response
 
@@ -27,12 +27,10 @@ def release_information():
     return {"app": static_info.name, "version": static_info.version}
 
 
-@app.get("/ping")
-def release_information():
-    return Response('', status_code=200, headers={'Content-type': 'text/plain'})
-
-
-@app.get(r'/.well-known/openid-configuration', response_model_exclude_defaults=True)
+@app.get(r'/.well-known/openid-configuration',
+         response_model_exclude_defaults=True,
+         tags=['oauth'],
+         summary='The OpenID Configuration of this Service')
 async def get_openid_configuration(request: Request) -> OpenIDConfiguration:
     base_url = str(request.base_url)
 

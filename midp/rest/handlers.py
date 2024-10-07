@@ -26,14 +26,38 @@ def create_router(resource_type: str, model_class: Type[T], controller_class: Ty
 
     controller: BaseRestController[T] = container.get(controller_class)
 
-    router.get('/', response_model=List[model_class])(controller.list)
-    router.post('/')(controller.create)
-    router.get('/{id}', response_model=model_class)(controller.get)
-    router.patch('/{id}')(controller.patch)
-    router.put('/{id}')(controller.put)
-    router.delete('/{id}')(controller.delete)
+    router.get(
+        '/',
+        summary=f'{resource_type.upper()}: List resources',
+        response_model=List[model_class],
+    )(controller.list)
+    router.post(
+        '/',
+        summary=f'{resource_type.upper()}: Create a new resource',
+        response_model=model_class,
+    )(controller.create)
+    router.get(
+        '/{id}',
+        summary=f'{resource_type.upper()}: Get a resource by ID',
+        response_model=model_class,
+    )(controller.get)
+    router.patch(
+        '/{id}',
+        summary=f'{resource_type.upper()}: Patch a resource identified by ID',
+        response_model=model_class,
+    )(controller.patch)
+    router.put(
+        '/{id}',
+        summary=f'{resource_type.upper()}: Put a resource identified by ID',
+        response_model=model_class,
+    )(controller.put)
+    router.delete(
+        '/{id}',
+        summary=f'{resource_type.upper()}: Delete a resource by ID',
+    )(controller.delete)
 
     return router
+
 
 rest_routers = [
     create_router('clients', IAMOAuthClient, ClientRestController),

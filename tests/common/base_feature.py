@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient
 from midp.common.env_helpers import optional_env
-from midp.config import MainConfig
+from midp.config import AppSnapshot
 
 
 class TestConfig:
@@ -17,7 +17,7 @@ class TestConfig:
 
     # Load the test configuration.
     with open(optional_env('TEST_CONFIG_FILE_PATH', 'config-auto-testing.yml'), 'r') as f:
-        TEST_BASE_CONFIG: MainConfig = MainConfig(**yaml.load(f.read(), Loader=yaml.SafeLoader))
+        TEST_BASE_CONFIG: AppSnapshot = AppSnapshot(**yaml.load(f.read(), Loader=yaml.SafeLoader))
 
 
 class _ClientOutput(ClientOutput):

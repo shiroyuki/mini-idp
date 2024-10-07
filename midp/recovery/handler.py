@@ -6,7 +6,7 @@ from imagination import container
 from pydantic import BaseModel, Field
 
 from midp.common.web_helpers import make_generic_json_response, GenericResponse
-from midp.config import MainConfig, restore_from_snapshot, export_snapshot
+from midp.config import AppSnapshot, restore_from_snapshot, export_snapshot
 
 recovery_router = APIRouter(
     prefix=r'/rpc/recovery',
@@ -20,12 +20,18 @@ recovery_router = APIRouter(
 )
 
 
-@recovery_router.post("/import", response_model=MainConfig, response_model_exclude_defaults=True)
-async def import_from_configuration(main_config: MainConfig):
+@recovery_router.post("/snapshot",
+                      response_model=AppSnapshot,
+                      response_model_exclude_defaults=True,
+                      summary='Import resources from the snapshot file')
+async def import_from_snapshot(main_config: AppSnapshot):
     await asyncio.to_thread(restore_from_snapshot, main_config)
     return await asyncio.to_thread(export_snapshot)
 
 
-@recovery_router.post("/export", response_model=MainConfig, response_model_exclude_defaults=True)
-async def export_config():
+@recovery_router.get("/snapshot",
+                      response_model=AppSnapshot,
+                      response_model_exclude_defaults=True,
+                      summary='Export a snapshot of the system')
+async def generate_snapshot():
     return await asyncio.to_thread(export_snapshot)

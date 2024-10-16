@@ -1,3 +1,5 @@
+*.pem
+poetry.lock
 .idea
 .vscode
 

@@ -3,7 +3,6 @@ from typing import Dict, Any, Optional, Tuple, Union
 from uuid import uuid4
 
 from imagination.decorator.service import Service
-from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
 from midp.common.key_storage import KeyStorage
@@ -34,8 +33,15 @@ class Session:
     def expires(self):
         return self.__expires
 
+    @property
+    def is_unset(self):
+        return not bool(self.__data)
+
     def save(self):
         self.__manager.save(self)
+
+    def __repr__(self):
+        return f'<Session id={self.__id} data={self.__data}>'
 
 
 @Service()

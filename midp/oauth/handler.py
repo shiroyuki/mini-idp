@@ -1,21 +1,23 @@
 import asyncio
 import hashlib
 import re
+from math import floor
 from time import time
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 from urllib.parse import urljoin
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Form, Depends
 from imagination import container
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, RedirectResponse
 
 from midp.common.key_storage import KeyStorage
 from midp.common.session_manager import Session
-from midp.common.token_manager import UserTokenManager, TokenSet, TokenGenerationError
+from midp.common.token_manager import PrivilegeTokenGenerator, TokenSet, TokenGenerationError
 from midp.common.web_helpers import restore_session
 from midp.iam.models import PredefinedScope, IAMPolicySubject
+from midp.log_factory import get_logger_for
 from midp.models import GrantType
 from midp.oauth.access_evaluator import AccessEvaluator
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
@@ -34,6 +36,8 @@ oauth_router = APIRouter(
     },
 )
 
+SERVICE_TO_SERVICE_URI_PREFIX = r'client://'
+
 
 @oauth_router.post(r'/login')
 async def sign_in(request: Request,
@@ -41,6 +45,7 @@ async def sign_in(request: Request,
                   username: Annotated[str, Form()],
                   password: Annotated[str, Form()],
                   session: Annotated[Session, Depends(restore_session)]) -> LoginResponse:
+    # TODO Prevent the brute-force/DOS attack with implementing the rate limit.
     if request.headers.get("accept") == 'application/json':
         session_user = session.data.get('user')
 
@@ -74,7 +79,7 @@ async def sign_in(request: Request,
 
 @oauth_router.post(r'/session')
 async def check_session_authorization(response: Response,
-                  session: Annotated[Session, Depends(restore_session)]):
+                                      session: Annotated[Session, Depends(restore_session)]):
     session_user = session.data.get('user')
 
     if session_user:
@@ -86,6 +91,7 @@ async def check_session_authorization(response: Response,
 
 @oauth_router.post(r'/device')
 async def initiate_device_authorization(client_id: Annotated[str, Form()],
+                                        session: Annotated[Session, Depends(restore_session)],
                                         scope: Annotated[str, Form()],
                                         request: Request,
                                         resource: Optional[str] = None,
@@ -97,8 +103,10 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
 
     requested_scopes = re.split(r'\s+', scope)
 
-    known_minimum_scopes = {PredefinedScope.OPENID.name, PredefinedScope.OFFLINE_ACCESS.name}.intersection(
-        requested_scopes)
+    known_minimum_scopes = {
+        PredefinedScope.OPENID.name,
+        PredefinedScope.OFFLINE_ACCESS.name
+    }.intersection(requested_scopes)
     if not known_minimum_scopes:
         return DeviceVerificationCodeResponse(error='invalid_scope')
 
@@ -112,7 +120,7 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
     user_code = hasher.hexdigest()[:8].upper()
 
     key_storage: KeyStorage = container.get(KeyStorage)
-    expiry_timestamp = time() + verification_ttl
+    expiry_timestamp = floor(time() + verification_ttl)
 
     await asyncio.gather(
         key_storage.async_set(
@@ -156,7 +164,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                          request: Request,
                          response: Response) -> TokenExchangeResponse:
     access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
-    user_token_manager: UserTokenManager = container.get(UserTokenManager)
+    user_token_manager: PrivilegeTokenGenerator = container.get(PrivilegeTokenGenerator)
 
     if grant_type == GrantType.DEVICE_CODE:
         await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
@@ -167,15 +175,23 @@ async def exchange_token(client_id: Annotated[str, Form()],
         if verification_state == 'ok':
             verified_info = await key_storage.async_get(f'device-code:{device_code}/info')
             resource_url = verified_info['resource_url']
-            subject = verified_info['sub']
+            subject: str = verified_info['sub']
             requested_scopes = verified_info['scopes']
+
+            if subject.startswith(SERVICE_TO_SERVICE_URI_PREFIX):
+                iam_policy_subject = IAMPolicySubject(subject=subject[len(SERVICE_TO_SERVICE_URI_PREFIX):],
+                                                      kind='service')
+            else:
+                iam_policy_subject = IAMPolicySubject(subject=subject,
+                                                      kind='user')
+
             try:
                 token_set: TokenSet = await asyncio.to_thread(user_token_manager.generate,
-                                                              IAMPolicySubject(subject=subject, kind='user'),
+                                                              iam_policy_subject,
                                                               resource_url,
                                                               requested_scopes)
                 return TokenExchangeResponse(access_token=token_set.access_token,
-                                             expires_in=token_set.access_claims['exp'] - time(),
+                                             expires_in=floor(token_set.access_claims['exp'] - time()),
                                              refresh_token=token_set.refresh_token)
             except TokenGenerationError as e:
                 return TokenExchangeResponse(error=e.args[0])
@@ -187,21 +203,40 @@ async def exchange_token(client_id: Annotated[str, Form()],
 
 
 @oauth_router.post(r'/device-activation')
-async def confirm_for_device_activation(data: DeviceAuthorizationRequest,
-                                        response: Response) -> DeviceAuthorizationResponse:
-    # TODO Enforce user authentication
+async def confirm_for_device_activation(request: Request,
+                                        session: Annotated[Session, Depends(restore_session)],
+                                        data: DeviceAuthorizationRequest,
+                                        response: Response):
+    log = get_logger_for('initiate_device_authorization')
+
+    json_activation = request.headers.get('accept') == 'application/json'
+
+    if session.is_unset:
+        return (
+            DeviceAuthorizationResponse(error='not_authenticated', error_description='invalid_session')
+            if json_activation
+            else RedirectResponse(f'/#/login?next_url=/oauth/device-activation')
+        )
 
     key_storage: KeyStorage = container.get(KeyStorage)
 
     device_code: str = await key_storage.async_get(f'user-code:{data.user_code}/device-code')
     if not device_code:
         response.status_code = 400
-        return DeviceAuthorizationResponse(error='expired_token', error_description='device_code.not_found')
+        return (
+            DeviceAuthorizationResponse(error='expired_token', error_description='device_code.not_found')
+            if json_activation
+            else RedirectResponse(f'/#/error?code=expired_token&description=device_code.not_found')
+        )
 
     expected_user_code: str = await key_storage.async_get(f'device-code:{device_code}/user-code')
     if not expected_user_code:
         response.status_code = 400
-        return DeviceAuthorizationResponse(error='expired_token', error_description='stored-user-code.not_found')
+        return (
+            DeviceAuthorizationResponse(error='expired_token', error_description='stored-user-code.not_found')
+            if json_activation
+            else RedirectResponse(f'/#/error?code=expired_token&description=stored-user-code.not_found')
+        )
 
     if data.user_code == expected_user_code:
         await key_storage.async_set(f'device-code:{device_code}/state',
@@ -211,4 +246,8 @@ async def confirm_for_device_activation(data: DeviceAuthorizationRequest,
     else:
         # Not updating the state
         response.status_code = 403
-        return DeviceAuthorizationResponse(error='wrong_user_code')
+        return (
+            DeviceAuthorizationResponse(error='wrong_user_code')
+            if json_activation
+            else RedirectResponse(f'/#/error?code=wrong_user_code')
+        )

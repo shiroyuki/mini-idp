@@ -4,9 +4,10 @@ from typing import TypeVar, Generic, List, Type, Dict, Any, Optional
 from urllib.parse import urljoin, quote_plus
 
 import requests
+from pydantic import BaseModel, Field
 from requests import Response
 
-from midp.config import AppSnapshot
+from midp.configuration.models import AppSnapshot
 from midp.log_factory import get_logger_for, get_logger_for_object
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
 from midp.models import GrantType
@@ -16,7 +17,22 @@ T = TypeVar('T')
 
 
 def _assert_response(response: Response, status_codes: List[int]):
-    assert response.status_code in status_codes, f'HTTP {response.status_code}: {response.text}'
+    assert response.status_code in status_codes, f'HTTP {response.status_code} from {response.request.method} {response.request.url}: {response.text}'
+
+
+class WebClientSession(BaseModel):
+    access_token: str
+    refresh_token: Optional[str] = None
+
+
+class WebClientContextConfig(BaseModel):
+    base_url: str
+
+
+class WebClientConfig(BaseModel):
+    release_version: str = '1.0'
+    current_context: str = 'default'
+    contexts: Dict[str, WebClientContextConfig] = Field(default_factory=dict)
 
 
 class RestAPIClient(Generic[T]):
@@ -102,6 +118,10 @@ class MiniIDP:
                                                             IAMUser)
 
     @property
+    def base_url(self):
+        return self._base_url
+
+    @property
     def clients(self):
         return self._clients
 
@@ -122,13 +142,13 @@ class MiniIDP:
         return self._users
 
     def restore(self, config: AppSnapshot):
-        response = requests.post(urljoin(self._base_url, 'rpc/recovery/import'),
+        response = requests.post(urljoin(self._base_url, 'rpc/recovery/snapshot'),
                                  json=config.model_dump(mode='python'))
 
         _assert_response(response, [200])
 
     def export(self) -> AppSnapshot:
-        response = requests.get(urljoin(self._base_url, 'rpc/recovery/export'))
+        response = requests.get(urljoin(self._base_url, 'rpc/recovery/snapshot'))
 
         _assert_response(response, [200])
 
@@ -141,7 +161,7 @@ class MiniIDP:
             self._openid_config = OpenIDConfiguration(**response.json())
         return self._openid_config
 
-    def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None):
+    def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None, no_browser: bool = False):
         openid_config = self.get_openid_configuration()
 
         query_string = ''

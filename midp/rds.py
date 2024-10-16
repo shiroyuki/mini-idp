@@ -1,9 +1,9 @@
 import traceback
-from typing import Optional, Dict, Any, Union, List
+from typing import Dict, Any, Union, List
 
 from imagination.decorator.config import EnvironmentVariable
 from imagination.decorator.service import Service
-from sqlalchemy import text, Engine, create_engine, Connection, TextClause, bindparam, Result, CursorResult
+from sqlalchemy import text, Engine, create_engine, Connection
 
 from midp.log_factory import get_logger_for_object
 

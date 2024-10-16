@@ -6,7 +6,8 @@ from imagination import container
 from pydantic import BaseModel, Field
 
 from midp.common.web_helpers import make_generic_json_response, GenericResponse
-from midp.config import AppSnapshot, restore_from_snapshot, export_snapshot
+from midp.configuration.models import AppSnapshot
+from midp.configuration.handlers import restore_from_snapshot, export_snapshot
 
 recovery_router = APIRouter(
     prefix=r'/rpc/recovery',

@@ -21,7 +21,7 @@ users:
 clients:
   - name: 'app_0'
     secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
-    audience: 'http://localhost:8080/realms/auto-testing-a/'
+    audience: 'http://faux.shiroyuki.com/resource-0'
     grant_types:
       - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
       - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
@@ -39,7 +39,7 @@ clients:
       - 'scope_b'
   - name: 'app_1'
     secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
-    audience: 'http://localhost:8080/realms/auto-testing-a/'
+    audience: 'http://faux.shiroyuki.com/resource-1'
     grant_types:
       - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
     response_types: [ 'code' ]
@@ -54,7 +54,7 @@ clients:
       - 'scope_b'
   - name: 'app_2'
     secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
-    audience: 'http://localhost:8080/realms/auto-testing-a/'
+    audience: 'http://faux.shiroyuki.com/resource-2'
     grant_types:
       - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
     response_types: [ 'code' ]
@@ -68,7 +68,7 @@ clients:
       - 'scope_b'
 policies:
   - name: 'iam-policy-for-role-a'
-    resource: 'http://localhost:8080/realms/auto-testing-a/'
+    resource: 'http://faux.shiroyuki.com/resource-0'
     subjects:
       - kind: 'role'
         subject: 'role_a'
@@ -83,7 +83,7 @@ policies:
       # App-specific Scopes
       - 'scope_a'
   - name: 'iam-policy-for-role-b'
-    resource: 'http://localhost:8080/realms/auto-testing-a/'
+    resource: 'http://faux.shiroyuki.com/resource-0'
     subjects:
       - kind: 'role'
         subject: 'role_b'

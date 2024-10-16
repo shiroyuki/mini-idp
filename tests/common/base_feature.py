@@ -2,14 +2,18 @@ import asyncio
 import traceback
 from typing import Callable, List, Dict, Any
 from unittest import TestCase
+from urllib.parse import urljoin
 from uuid import uuid4
 
+import requests
 import yaml
 from dotenv import load_dotenv
+from requests import Session, Response
 
 from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient
 from midp.common.env_helpers import optional_env
-from midp.config import AppSnapshot
+from midp.configuration.models import AppSnapshot
+from midp.log_factory import get_logger_for
 
 
 class TestConfig:
@@ -68,6 +72,10 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls._log = get_logger_for(cls.__name__)
+        cls._http_session = requests.Session()
+        cls.defer_after_all(cls._http_session.close)
+
         if not cls._env_loaded:
             load_dotenv()
             cls._env_loaded = True
@@ -105,3 +113,22 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
             await asyncio.gather(*coroutines)
 
         asyncio.run(delete_many())
+
+    @classmethod
+    def _authenticate_as(cls, user_name: str):
+        try:
+            user = [u for u in cls._test_config.users if u.name == user_name][0]
+        except IndexError:
+            raise RuntimeError(f'User {user_name} is not found in the test configuration.')
+
+        return cls._authenticate(cls._http_session, user.name, user.password)
+
+    @classmethod
+    def _authenticate(cls, session: Session, username: str, password: str) -> Response:
+        response = session.post(urljoin(cls._client.base_url, 'oauth/login'),
+                                headers={'Accept': 'application/json'},
+                                data=dict(username=username, password=password))
+
+        assert response.status_code == 200, f'Failed to log in with {dict(username=username, password=password)}'
+
+        return response

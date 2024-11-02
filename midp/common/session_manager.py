@@ -6,7 +6,7 @@ from imagination.decorator.service import Service
 
 from midp.common.enigma import Enigma
 from midp.common.key_storage import KeyStorage
-from midp.static_info import access_token_ttl
+from midp.static_info import ACCESS_TOKEN_TTL
 
 
 class Session:
@@ -58,7 +58,7 @@ class SessionManager:
         else:
             session_id = str(uuid4())
 
-        return session_id, time() + access_token_ttl
+        return session_id, time() + ACCESS_TOKEN_TTL
 
     def load(self, id: Optional[str] = None, encrypted_id: Optional[str] = None) -> Session:
         session_id, expiry_timestamp = self.get_metadata(id, encrypted_id)
@@ -70,4 +70,4 @@ class SessionManager:
                        expires=expiry_timestamp)
 
     def save(self, session: Session):
-        self._kv.set(f'session:{session.id}', session.data, time() + access_token_ttl)
+        self._kv.set(f'session:{session.id}', session.data, time() + ACCESS_TOKEN_TTL)

@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded');
+@import "common.css";
+
+/* Reset */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-width: 100vw;
+  min-height: 100vh;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+h1, h2, h3, h4, h5, h6, p, blockquote, ul, ol, li, dl {
+  padding: 0;
+  margin: 0;
+}
+
+/* Global Appearance */
+
+input[type="text"], input[type="password"] {
+  padding: 8px;
+  font-size: 1rem;
+
+  color: var(--veryDarkGrey);
+  border: 1px solid var(--grey);
+  background-color: #fff;
+  border-radius: var(--elementCornerRadius);
+
+  &:hover,&:focus,&:active {
+    color: #000;
+    border: 1px solid var(--veryDarkGrey);
+  }
+}
+
+button {
+  cursor: pointer;
+  padding: 8px;
+  font-size: 1rem;
+  border: none;
+
+  color: #fff;
+  background-color: var(--darkGrey);
+  border-radius: var(--elementCornerRadius);
+
+  &:hover,&:focus,&:active {
+    color: #fff;
+    background-color: var(--veryDarkGrey);
+  }
+}
+
+.screen-centre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #333;
+  min-width: 320px;
+
+  header {
+    padding: 8px 24px;
+    font-weight: 700;
+    background-color: #000;
+    color: #fff;
+  }
+
+  h1 {
+      padding: 8px 24px;
+  }
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  margin: 0;
+
+  & > div {
+    display: flex;
+    flex-direction: column;
+    margin-top: 1rem;
+  }
+
+  & > .field label {
+    margin-bottom: 0.5rem;
+  }
+
+  & > .actions {
+    margin-top: 32px;
+  }
+}
+
+.login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+
+  .form-container {
+    /* */
+  }
+}

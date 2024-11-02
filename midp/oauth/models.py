@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from pydantic import BaseModel, ConfigDict
 
 from midp.iam.models import IAMUserReadOnly
-from midp.static_info import verification_ttl
+from midp.static_info import VERIFICATION_TTL
 
 
 class GenericOAuthResponse(BaseModel):
@@ -17,6 +17,8 @@ class GenericOAuthResponse(BaseModel):
 class LoginResponse(GenericOAuthResponse):
     principle: Optional[IAMUserReadOnly] = None
     session_id: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     already_exists: Optional[bool] = None
 
 
@@ -33,7 +35,7 @@ class DeviceVerificationCodeResponse(GenericOAuthResponse):
              base_url: str,
              device_code: str,
              user_code: str,
-             expires_in: int = verification_ttl,
+             expires_in: int = VERIFICATION_TTL,
              check_interval: int = 5):
         if not base_url.endswith('/'):
             base_url += '/'

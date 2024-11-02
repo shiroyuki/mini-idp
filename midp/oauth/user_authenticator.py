@@ -1,11 +1,11 @@
-from time import sleep
 from typing import Optional
 
 from imagination.decorator.service import Service
 from pydantic import BaseModel
 
+from midp.common.token_manager import PrivilegeTokenGenerator
 from midp.iam.dao.user import UserDao
-from midp.iam.models import IAMUserReadOnly
+from midp.iam.models import IAMUserReadOnly, IAMPolicySubject
 
 
 class AuthenticationResult(BaseModel):
@@ -29,17 +29,21 @@ class AuthenticationError(RuntimeError):
 
 @Service()
 class UserAuthenticator:
-    def __init__(self, user_dao: UserDao):
+    def __init__(self, user_dao: UserDao, token_manager: PrivilegeTokenGenerator):
         self._user_dao = user_dao
+        self._token_manager = token_manager
 
-    def authenticate(self, username: str, password: str) -> AuthenticationResult:
+    def authenticate(self, username: str, password: str, resource_url: Optional[str] = None) -> AuthenticationResult:
         user = self._user_dao.get(username)
 
         if user and user.password == password:
+            policy_subject = IAMPolicySubject(subject=user.name, kind="user")
+            token_set = self._token_manager.generate(subject=policy_subject, resource_url=resource_url)
+
             return AuthenticationResult(
                 principle=IAMUserReadOnly.build_from(user),
-                access_token='',
-                refresh_token='',
+                access_token=token_set.access_token,
+                refresh_token=token_set.refresh_token,
             )
         else:
             raise AuthenticationError('invalid_credential', 'Invalid Credential')

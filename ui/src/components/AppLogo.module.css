@@ -1,0 +1,29 @@
+.appLogo {
+    display: flex;
+    flex-direction: column;
+    order: 0;
+    align-self: start;
+}
+
+.appName {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.appVersion {
+    display: flex;
+    align-items: center;
+
+    & > span:first-child {
+        display: block;
+        width: 64px;
+        height: 8px;
+        background-color: #000;
+    }
+
+    & > span:last-child {
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 8px;
+    }
+}

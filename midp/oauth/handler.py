@@ -7,12 +7,13 @@ from typing import Annotated, Optional, Union
 from urllib.parse import urljoin
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Form, Depends
+from fastapi import APIRouter, HTTPException, Form, Depends, Query
 from imagination import container
+from sqlalchemy.sql.functions import session_user
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
 
-from midp.common.key_storage import KeyStorage
+from midp.common.key_storage import KeyStorage, Entry
 from midp.common.session_manager import Session
 from midp.common.token_manager import PrivilegeTokenGenerator, TokenSet, TokenGenerationError
 from midp.common.web_helpers import restore_session
@@ -23,7 +24,7 @@ from midp.oauth.access_evaluator import AccessEvaluator
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
     DeviceAuthorizationRequest, DeviceAuthorizationResponse, LoginResponse
 from midp.oauth.user_authenticator import UserAuthenticator, AuthenticationResult, AuthenticationError
-from midp.static_info import verification_ttl
+from midp.static_info import VERIFICATION_TTL
 
 oauth_router = APIRouter(
     prefix=r'/oauth',
@@ -47,7 +48,7 @@ async def sign_in(request: Request,
                   session: Annotated[Session, Depends(restore_session)]) -> LoginResponse:
     # TODO Prevent the brute-force/DOS attack with implementing the rate limit.
     if request.headers.get("accept") == 'application/json':
-        session_user = session.data.get('user')
+        session_user = None # session.data.get('user')
 
         response_body = LoginResponse(already_exists=session_user is not None)
 
@@ -67,6 +68,8 @@ async def sign_in(request: Request,
                 response.set_cookie('sid', session.encrypted_id)
                 response_body.session_id = session.id
                 response_body.principle = result.principle
+                response_body.access_token = result.access_token
+                response_body.refresh_token = result.refresh_token
             except AuthenticationError as e:
                 response.status_code = 400
                 response_body.error = e.code
@@ -77,7 +80,30 @@ async def sign_in(request: Request,
         raise HTTPException(400)
 
 
-@oauth_router.post(r'/session')
+@oauth_router.get(r'/logout')
+async def sign_out(session: Annotated[Session, Depends(restore_session)]):
+    if 'user' in session.data:
+        del session.data['user']
+        session.save()
+
+        # TODO Deactivate the access and refresh tokens.
+
+    return None
+
+
+@oauth_router.get(r'/me/token')
+async def check_token(response: Response, session: Annotated[Session, Depends(restore_session)]):
+    session_user = session.data.get('user')
+
+    if session_user:
+        return session_user
+    else:
+        response.status_code = 401
+        return None
+
+
+
+@oauth_router.get(r'/me/session')
 async def check_session_authorization(response: Response,
                                       session: Annotated[Session, Depends(restore_session)]):
     session_user = session.data.get('user')
@@ -94,6 +120,7 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
                                         session: Annotated[Session, Depends(restore_session)],
                                         scope: Annotated[str, Form()],
                                         request: Request,
+                                        response: Response,
                                         resource: Optional[str] = None,
                                         ):
     access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
@@ -108,10 +135,12 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
         PredefinedScope.OFFLINE_ACCESS.name
     }.intersection(requested_scopes)
     if not known_minimum_scopes:
+        response.status_code = 400
         return DeviceVerificationCodeResponse(error='invalid_scope')
 
     error_code = await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
     if error_code:
+        response.status_code = 400
         return DeviceVerificationCodeResponse(error=error_code)
 
     device_code = str(uuid4())
@@ -120,32 +149,33 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
     user_code = hasher.hexdigest()[:8].upper()
 
     key_storage: KeyStorage = container.get(KeyStorage)
-    expiry_timestamp = floor(time() + verification_ttl)
+    expiry_timestamp = floor(time() + VERIFICATION_TTL)
 
-    await asyncio.gather(
-        key_storage.async_set(
-            f'user-code:{user_code}/device-code',
-            device_code,
-            expiry_timestamp
+    await asyncio.to_thread(
+        key_storage.batch_set,
+        Entry(
+            key=f'user-code:{user_code}/device-code',
+            value=device_code,
+            expiry_timestamp=expiry_timestamp,
         ),
-        key_storage.async_set(
-            f'device-code:{device_code}/state',
-            'authorization_pending',
-            expiry_timestamp
+        Entry(
+            key=f'device-code:{device_code}/state',
+            value='authorization_pending',
+            expiry_timestamp=expiry_timestamp,
         ),
-        key_storage.async_set(
-            f'device-code:{device_code}/user-code',
-            user_code,
-            expiry_timestamp
+        Entry(
+            key=f'device-code:{device_code}/user-code',
+            value=user_code,
+            expiry_timestamp=expiry_timestamp,
         ),
-        key_storage.async_set(
-            f'device-code:{device_code}/info',
-            {
+        Entry(
+            key=f'device-code:{device_code}/info',
+            value={
                 'sub': 'user_a',
                 'scopes': requested_scopes,
                 'resource_url': resource_url,
             },
-            expiry_timestamp
+            expiry_timestamp=expiry_timestamp,
         ),
     )
 
@@ -153,7 +183,7 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
         base_url=oauth_base_url,
         device_code=device_code,
         user_code=user_code,
-        expires_in=verification_ttl,
+        expires_in=VERIFICATION_TTL,
     )
 
 
@@ -164,7 +194,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                          request: Request,
                          response: Response) -> TokenExchangeResponse:
     access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
-    user_token_manager: PrivilegeTokenGenerator = container.get(PrivilegeTokenGenerator)
+    token_manager: PrivilegeTokenGenerator = container.get(PrivilegeTokenGenerator)
 
     if grant_type == GrantType.DEVICE_CODE:
         await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
@@ -186,7 +216,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                                                       kind='user')
 
             try:
-                token_set: TokenSet = await asyncio.to_thread(user_token_manager.generate,
+                token_set: TokenSet = await asyncio.to_thread(token_manager.generate,
                                                               iam_policy_subject,
                                                               resource_url,
                                                               requested_scopes)
@@ -200,6 +230,11 @@ async def exchange_token(client_id: Annotated[str, Form()],
             return TokenExchangeResponse(error=verification_state or 'unexpected_state')
     else:
         raise HTTPException(501)
+
+
+@oauth_router.get(r'/device-activation')
+def redirect_to_device_code_confirmation_page(request: Request, user_code: Annotated[Optional[str], Query()]):
+    return RedirectResponse(f'/#/oauth/device-activation?user_code={user_code}&origin={request.url}')
 
 
 @oauth_router.post(r'/device-activation')
@@ -241,7 +276,7 @@ async def confirm_for_device_activation(request: Request,
     if data.user_code == expected_user_code:
         await key_storage.async_set(f'device-code:{device_code}/state',
                                     'ok' if data.authorized else 'access_denied',
-                                    time() + verification_ttl)
+                                    time() + VERIFICATION_TTL)
         return DeviceAuthorizationResponse(device_code=device_code, authorized=data.authorized)
     else:
         # Not updating the state

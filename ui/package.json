@@ -11,9 +11,10 @@
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.112",
+    "@types/node": "^22.7.9",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
+    "classnames": "^2.5.1",
     "http-proxy-middleware": "^3.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -23,6 +24,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "build-dev": "vite build --emptyOutDir --watch --sourcemap inline --minify false",
+    "build-prod": "vite build --emptyOutDir --minify",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -47,6 +50,8 @@
     ]
   },
   "devDependencies": {
-    "sass": "^1.79.4"
+    "@vitejs/plugin-react": "^4.3.3",
+    "sass": "^1.79.4",
+    "vite": "^5.4.10"
   }
 }

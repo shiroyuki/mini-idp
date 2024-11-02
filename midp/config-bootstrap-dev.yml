@@ -1,0 +1,88 @@
+# Bootstrap Configuration for Mini IDP (Dev Mode)
+scopes:
+  - name: 'idp.admin'
+  - name: 'idp.editor'
+  - name: 'idp.user'
+  - name: 'idp.client.read'
+  - name: 'idp.client.read_sensitive'
+  - name: 'idp.client.write'
+  - name: 'idp.policy.read'
+  - name: 'idp.policy.write'
+  - name: 'idp.role.read'
+  - name: 'idp.role.write'
+  - name: 'idp.scope.read'
+  - name: 'idp.scope.write'
+  - name: 'idp.user.read'
+  - name: 'idp.user.write'
+roles:
+  - name: 'idp.admin'
+  - name: 'idp.editor'
+  - name: 'idp.user'
+users:
+  - name: 'root'
+    password: 'nosecret'
+    roles: [ 'idp.admin' ]
+    email: 'admin@idp.dev.shiroyuki.com'
+clients: []
+policies:
+  - name: 'idp.admin'
+    resource: 'http://localhost:8081/'
+    subjects:
+      - kind: 'role'
+        subject: 'idp.admin'
+    scopes:
+      # Common Scopes
+      - 'openid'
+      - 'profile'
+      # App-specific Scopes
+      - name: 'idp.admin'
+      - name: 'idp.client.read'
+      - name: 'idp.client.read_sensitive'
+      - name: 'idp.client.write'
+      - name: 'idp.policy.read'
+      - name: 'idp.policy.write'
+      - name: 'idp.role.read'
+      - name: 'idp.role.write'
+      - name: 'idp.scope.read'
+      - name: 'idp.scope.write'
+      - name: 'idp.user.read'
+      - name: 'idp.user.write'
+  - name: 'idp.editor'
+    resource: 'http://localhost:8081/'
+    subjects:
+      - kind: 'role'
+        subject: 'idp.editor'
+    scopes:
+      # Common Scopes
+      - 'openid'
+      - 'profile'
+      # App-specific Scopes
+      - name: 'idp.editor'
+      - name: 'idp.client.read'
+      - name: 'idp.client.read_sensitive'
+      - name: 'idp.client.write'
+      - name: 'idp.policy.read'
+      - name: 'idp.policy.write'
+      - name: 'idp.role.read'
+      - name: 'idp.role.write'
+      - name: 'idp.scope.read'
+      - name: 'idp.scope.write'
+      - name: 'idp.user.read'
+      - name: 'idp.user.write'
+  - name: 'idp.user'
+    resource: 'http://localhost:8081/'
+    subjects:
+      - kind: 'role'
+        subject: 'idp.user'
+    scopes:
+      # Common Scopes
+      - 'openid'
+      - 'profile'
+      # App-specific Scopes
+      - name: 'idp.user'
+      - name: 'idp.client.read'
+      - name: 'idp.policy.read'
+      - name: 'idp.role.read'
+      - name: 'idp.scope.read'
+      - name: 'idp.user.read'
+      - name: 'idp.user.write'

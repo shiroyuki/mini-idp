@@ -7,8 +7,10 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import Response
 
+from midp.common.env_helpers import SELF_REFERENCE_URI
 from midp.common.renderer import TemplateRenderer
 from midp.common.session_manager import SessionManager, Session
+from midp.common.token_manager import TokenParser
 
 
 class GenericResponse(BaseModel):
@@ -64,3 +66,14 @@ async def restore_session(request: Request) -> Session:
     session_manager: SessionManager = container.get(SessionManager)
     session: Session = await asyncio.to_thread(session_manager.load, encrypted_id=request.cookies.get('sid'))
     return session
+
+
+async def authenticate_with_local_token(request: Request) -> Dict[str, Any]:
+    raw_bearer_token = request.headers.get('Authorization')
+    if raw_bearer_token and raw_bearer_token.startswith('Bearer '):
+        bearer_token = raw_bearer_token[len('Bearer '):]
+
+    token_parser: TokenParser = container.get(TokenParser)
+    claims: Dict[str, Any] = await asyncio.to_thread(token_parser.parse,
+                                                     token=bearer_token)
+    return claims

@@ -1,12 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.scss';
+import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
-import Login from './pages/Login';
-import { loadRealm } from './pages/realms/loaders';
-import RealmLogin from './pages/realms/RealmLogin';
+import {MainDashboardPage} from "./pages/MainDashboardPage";
+import LoginComponent from "./components/LoginComponent";
 
 const router = createHashRouter([
   {
@@ -16,12 +15,11 @@ const router = createHashRouter([
     children: [
       {
         path: 'login',
-        element: <Login/>,
+        element: <LoginComponent/>,
       },
       {
-        path: 'realms/:realmId/login',
-        element: <RealmLogin/>,
-        loader: loadRealm,
+        path: '',
+        element: <MainDashboardPage />,
       }
     ]
   },

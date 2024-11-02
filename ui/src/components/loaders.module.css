@@ -1,0 +1,60 @@
+.linearLoader {
+    display: inline-flex;
+    align-items: center;
+
+    & > div:first-child {
+        background-color: var(--grey);
+        animation: linear-loading-animation 500ms infinite;
+
+        & + div {
+            margin-left: 8px;
+            color: var(--grey);
+        }
+    }
+}
+
+.linearLoaderNormal {
+    --linear-loader-radius: 12px;
+
+    & > div:first-child {
+        width: var(--linear-loader-radius);
+        height: var(--linear-loader-radius);
+        border-radius: var(--linear-loader-radius);
+    }
+}
+
+.linearLoaderLarge {
+    --linear-loader-radius: 24px;
+
+    & > div:first-child {
+        width: var(--linear-loader-radius);
+        height: var(--linear-loader-radius);
+        border-radius: var(--linear-loader-radius);
+
+        & + div {
+            font-size: 1.5rem;
+        }
+    }
+}
+
+@keyframes linear-loading-animation {
+    0% {
+        opacity: 1;
+    }
+
+    25% {
+        opacity: 0.1;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    75% {
+        opacity: 0.1;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

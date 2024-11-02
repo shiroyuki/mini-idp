@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+    <link rel="stylesheet" href="/public/basic.css">
+    <script>
+        var baseUrl = '{{ base_url }}';
+        var realmId = '{{ realm_id }}';
+    </script>
+</head>
+<body class="screen-centre" data-page="login">
+    {% if session_user %}
+        <article class="form-container">
+            <header>{{realm_id}}</header>
+            <h1>Hello, {{session_user.full_name or session_user.name}}</h1>
+        </article>
+    {% else %}
+        <article class="form-container">
+            <header>{{realm_id}}</header>
+            <div class="feedback"></div>
+            <h1>Sign in</h1>
+            <form method="post" action="#" autocomplete="off">
+                <div class="field">
+                    <label for="username">Username or Email Address</label>
+                    <input type="text" id="username" name="username"/>
+                </div>
+
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password"/>
+                </div>
+
+                <div class="actions">
+                    <button type="submit">Sign in</button>
+                </div>
+            </form>
+        </article>
+        <script src="/public/realm_login.js"></script>
+    {% endif %}
+</body>
+</html>

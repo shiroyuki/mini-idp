@@ -1,9 +1,7 @@
 import asyncio
-import traceback
 from typing import Callable, List, Dict, Any
 from unittest import TestCase
 from urllib.parse import urljoin
-from uuid import uuid4
 
 import requests
 import yaml
@@ -12,14 +10,14 @@ from requests import Session, Response
 
 from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient
 from midp.common.env_helpers import optional_env
-from midp.configuration.models import AppSnapshot
 from midp.log_factory import get_logger_for
+from midp.snapshot.models import AppSnapshot
 
 
 class TestConfig:
     TEST_BASE_URL = optional_env('TEST_BASE_URL', 'http://localhost:8081/')
 
-    # Load the test configuration.
+    # Load the test snapshot.
     with open(optional_env('TEST_CONFIG_FILE_PATH', 'config-auto-testing.yml'), 'r') as f:
         TEST_BASE_CONFIG: AppSnapshot = AppSnapshot(**yaml.load(f.read(), Loader=yaml.SafeLoader))
 

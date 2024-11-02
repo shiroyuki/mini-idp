@@ -49,6 +49,11 @@ class IAMRole(BaseModel):
     description: Optional[str] = None
 
 
+IDP_OWNER = IAMRole(name='idp.owner')
+IDP_ADMIN = IAMRole(name='idp.admin')
+IDP_USER = IAMRole(name='idp.user')
+
+
 class IAMUser(BaseModel):
     __tbl__ = 'iam_user'
 

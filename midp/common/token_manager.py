@@ -7,11 +7,24 @@ from imagination.decorator.service import Service
 from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
+from midp.common.env_helpers import SELF_REFERENCE_URI
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser
-from midp.static_info import access_token_ttl, refresh_token_ttl
+from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
+
+
+@Service()
+class TokenParser:
+    def __init__(self, enigma: Enigma):
+        self._enigma = enigma
+
+    def parse(self, token: str, audience: Optional[str] = None) -> Dict[str, Any]:
+        claims: Dict[str, Any] = dict()
+        claims.update(self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
+
+        return claims
 
 
 class TokenSet(BaseModel):
@@ -30,10 +43,10 @@ class GeneralTokenGenerator:
         current_time = time()
 
         final_access_claims = deepcopy(access_claims)
-        final_access_claims['exp'] = current_time + access_token_ttl
+        final_access_claims['exp'] = current_time + ACCESS_TOKEN_TTL
 
         final_refresh_claims = deepcopy(refresh_claims)
-        final_refresh_claims['exp'] = current_time + refresh_token_ttl
+        final_refresh_claims['exp'] = current_time + REFRESH_TOKEN_TTL
 
         return TokenSet(
             access_claims=final_access_claims,
@@ -56,11 +69,15 @@ class PrivilegeTokenGenerator:
         self._policy_dao = policy_dao
         self._client_dao = client_dao
 
+        self._self_reference_uri = SELF_REFERENCE_URI
+
+        if not self._self_reference_uri.endswith('/'):
+            self._self_reference_uri += '/'
+
     def generate(self,
                  subject: IAMPolicySubject,
-                 resource_url: str,
-                 requested_scopes: List[str]) -> TokenSet:
-        subject_id: Optional[str] = None
+                 resource_url: Optional[str] = None,
+                 requested_scopes: Optional[List[str]] = None) -> TokenSet:
         user: Optional[IAMUser] = None
 
         if subject.kind == 'service':
@@ -73,8 +90,10 @@ class PrivilegeTokenGenerator:
 
             print(f'PANDA: user = {user}')
 
-        if not resource_url:
-            raise TokenGenerationError('default_resource_url_not_yet_implemented')
+        subject_id: str = user.id
+
+        resource_url = resource_url or self._self_reference_uri
+        requested_scopes = requested_scopes or []
 
         if resource_url.endswith('/'):
             # When the resource URL ends with "/", we will look for all policies tied
@@ -116,12 +135,17 @@ class PrivilegeTokenGenerator:
         current_time = time()
 
         access_claims = dict(sub=subject_id,
+                             roles=user.roles,
+                             # TODO provide all requested scopes from the policy.
                              scope=' '.join(requested_scopes),
+                             iss=self._self_reference_uri,
                              aud=resource_url,
-                             exp=floor(current_time + access_token_ttl))
+                             exp=floor(current_time + ACCESS_TOKEN_TTL))
+
         refresh_claims = dict(sub=subject_id,
                               scope='openid refresh',
+                              iss=self._self_reference_uri,
                               aud=resource_url,
-                              exp=floor(current_time + (access_token_ttl * 7)))
+                              exp=floor(current_time + (ACCESS_TOKEN_TTL * 7)))
 
         return self._root_token_manager.generate(access_claims, refresh_claims)

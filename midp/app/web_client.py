@@ -7,7 +7,7 @@ import requests
 from pydantic import BaseModel, Field
 from requests import Response
 
-from midp.configuration.models import AppSnapshot
+from midp.snapshot.models import AppSnapshot
 from midp.log_factory import get_logger_for, get_logger_for_object
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
 from midp.models import GrantType
@@ -142,13 +142,13 @@ class MiniIDP:
         return self._users
 
     def restore(self, config: AppSnapshot):
-        response = requests.post(urljoin(self._base_url, 'rpc/recovery/snapshot'),
+        response = requests.post(urljoin(self._base_url, 'rpc/recovery'),
                                  json=config.model_dump(mode='python'))
 
         _assert_response(response, [200])
 
     def export(self) -> AppSnapshot:
-        response = requests.get(urljoin(self._base_url, 'rpc/recovery/snapshot'))
+        response = requests.get(urljoin(self._base_url, 'rpc/recovery'))
 
         _assert_response(response, [200])
 
@@ -161,7 +161,7 @@ class MiniIDP:
             self._openid_config = OpenIDConfiguration(**response.json())
         return self._openid_config
 
-    def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None, no_browser: bool = False):
+    def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None):
         openid_config = self.get_openid_configuration()
 
         query_string = ''

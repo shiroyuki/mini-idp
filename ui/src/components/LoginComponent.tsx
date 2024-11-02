@@ -1,149 +1,168 @@
-import { FormEvent, useState } from "react"
-import './LoginComponent.scss';
+import {FormEvent, useState} from "react";
+import style from './LoginComponent.module.css';
 import Icon from "./Icon";
+import {useNavigate, useOutletContext} from "react-router-dom";
+import {AppState} from "../common/app-state";
+import {LinearLoadingAnimation} from "./loaders";
+import LargeAppLogo from "./LargeAppLogo";
 
 interface LoginComponentProps {
-  // TODO This is temporary. Will replace with "realm".
-  realmId?: string | null;
 }
 
 interface Feedback {
-  type: string;
-  message?: string | null;
+    type: string;
+    message?: string | null;
 }
 
 interface LoginComponentState {
-  inFlight: boolean;
-  feedback: Feedback | null;
+    inFlight: boolean;
+    feedback: Feedback | null;
 }
 
 interface Principle {
-  id: string
-  realm_id: string | null
-  name: string
-  email: string
-  full_name: string | null
-  roles: string[]
+    id: string
+    name: string
+    email: string
+    full_name: string | null
+    roles: string[]
 }
 
 interface AuthenticationResponse {
-  error?: string | null;
-  error_description?: string | null;
-  session_id: string | null;
-  principle?: Principle | null;
-  already_exists: boolean;
+    error?: string | null;
+    error_description?: string | null;
+    session_id: string | null;
+    access_token: string | null;
+    refresh_token: string | null;
+    principle?: Principle | null;
+    already_exists: boolean;
 }
 
-const LoginComponent: React.FC<LoginComponentProps> = ({ realmId }) => {
-  const [formData, setFormData] = useState({ username: '', password: '' });
-  const [componentState, setComponentState] = useState<LoginComponentState>({
-    inFlight: false,
-    feedback: null,
-  })
+const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
+    const appState = useOutletContext<AppState>();
+    const navigate = useNavigate();
+    const [inFlight, setInFlight] = useState(false);
+    const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [formData, setFormData] = useState({username: '', password: ''});
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const {name, value} = e.target;
 
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value
-    }));
-  };
+        setFormData((prevData) => ({
+            ...prevData,
+            [name]: value
+        }));
+    };
 
-  const initiateLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    const initiateLogin = async (e: FormEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-    setComponentState(prevData => ({
-      ...prevData,
-      inFlight: true,
-      feedback: null,
-    }));
+        setInFlight(true);
 
-    const postData = new FormData();
-    postData.append('password', formData.password);
-    postData.append('username', formData.username);
+        const postData = new FormData();
+        postData.append('password', formData.password);
+        postData.append('username', formData.username);
 
-    const response = await fetch(
-      realmId ? `/realms/${realmId}/login` : '/root/login',
-      {
-        method: 'post',
-        headers: { 'Accept': 'application/json' },
-        body: postData,
-      }
-    );
+        const response = await fetch(
+            '/oauth/login',
+            {
+                method: 'post',
+                headers: {'Accept': 'application/json'},
+                body: postData,
+            }
+        );
 
-    const responseBody = await response.text();
+        const responseBody = await response.text();
 
-    if (response.status === 200) {
-      const result: AuthenticationResponse = JSON.parse(responseBody);
-      const resultOk: boolean = result.error === null;
+        if (response.status === 200) {
+            const result: AuthenticationResponse = JSON.parse(responseBody);
 
-      setComponentState(prevData => ({
-        ...prevData,
-        inFlight: false,
-        // Temporary Measure... Require redirection
-        feedback: {
-          type: resultOk ? 'ok' : 'error',
-          message: resultOk ? result.principle?.email : result.error,
-        },
-      }));
-    } else {
-      setComponentState(prevData => ({
-        ...prevData,
-        inFlight: false,
-        feedback: {
-          type: 'error',
-          message: `HTTP ${response.status} : ${responseBody}`,
-        },
-      }));
-    }
-  };
+            if (result.error === null) {
+                if (result.access_token !== null && result.access_token !== "") {
+                    sessionStorage.setItem("access_token", result.access_token);
+                } else {
+                    sessionStorage.removeItem("access_token");
+                }
 
-  const feedback = componentState.feedback
-    ? <div className={['feedback', 'feedback-of-' + componentState.feedback.type].join(' ')}>{componentState.feedback.message}</div>
-    : null;
+                if (result.refresh_token !== null && result.refresh_token !== "") {
+                    sessionStorage.setItem("refresh_token", result.refresh_token);
+                } else {
+                    sessionStorage.removeItem("refresh_token");
+                }
+            }
 
-  const loginForm = (
-    <form method="post" action="#" onSubmit={initiateLogin} >
-      <div className="field">
-        <label htmlFor="username">Username or Email Address</label>
-        <input
-          type="text"
-          id="username"
-          name="username"
-          required
-          value={formData.username}
-          onChange={handleChange} />
-      </div>
+            appState.runSessionValidation && appState.runSessionValidation();
+            navigate("/");
+        } else {
+            if (response.status < 500) {
+                setFeedback({
+                    type: "api.error",
+                    message: `${response.status}: ${responseBody}`,
+                });
+            } else {
+                setFeedback({
+                    type: "connection.error",
+                    message: `${response.status}: ${responseBody}`,
+                });
+            }
+            setInFlight(false);
+        }
+    };
 
-      <div className="field">
-        <label htmlFor="password">Password</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          required
-          value={formData.password}
-          onChange={handleChange} />
-      </div>
+    const inFlightIndicator = <LinearLoadingAnimation label={"Authenticating..."}/>
 
-      <div className="actions">
-        <button type="submit">Sign in</button>
-      </div>
-    </form>
-  );
+    return (
+        <article className={style.componentContainer}>
+            <div className={style.appName}>
+                <LargeAppLogo />
+            </div>
+            <div className={style.deploymentName}>{appState.serviceInfo?.deployment.name}</div>
+            {inFlight ? inFlightIndicator : (
+                <div className={style.formContainer + " form-container"}>
+                    {feedback
+                        ? (
+                            <>
+                                <h3>Unable to log in</h3>
+                                <p>{feedback.type}: {feedback.message}</p>
+                                <button onClick={ () => {setFeedback(null);} }>
+                                    Try again
+                                </button>
+                            </>
+                        ) : (
+                            <form method="post" action="#" onSubmit={initiateLogin}>
+                                <div className="field">
+                                    <label htmlFor="username">Username or Email Address</label>
+                                    <input
+                                        type="text"
+                                        id="username"
+                                        name="username"
+                                        required
+                                        value={formData.username}
+                                        onChange={handleChange}/>
+                                </div>
 
-  const inFlightIndicator = <div className="feedback">Authenticating...</div>
+                                <div className="field">
+                                    <label htmlFor="password">Password</label>
+                                    <input
+                                        type="password"
+                                        id="password"
+                                        name="password"
+                                        required
+                                        value={formData.password}
+                                        onChange={handleChange}/>
+                                </div>
 
-  return (
-    <article className="login-component form-container">
-      <header className={ ['mode', realmId ? 'mode-realm' : 'mode-master'].join(' ') }>{realmId || 'Mini IDP'}</header>
-      <h1>Sign in</h1>
-      {feedback}
-      {componentState.inFlight ? inFlightIndicator : loginForm}
-    </article>
-  )
+                                <div className="actions">
+                                    <button type="submit">Sign in</button>
+                                </div>
+                            </form>
+                        )
+                    }
+
+                </div>
+            )}
+        </article>
+    )
 }
 
 export default LoginComponent;

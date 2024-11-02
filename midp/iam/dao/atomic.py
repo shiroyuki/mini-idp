@@ -5,12 +5,16 @@ from typing import Generic, TypeVar, Any, Dict, Optional, Generator, Callable, L
 from pydantic import BaseModel
 
 from midp.log_factory import get_logger_for, get_logger_for_object
-from midp.rds import DataStore
+from midp.rds import DataStore, DataStoreSession
 
 T = TypeVar('T')
 
 
 class InsertError(RuntimeError):
+    pass
+
+
+class UpdateError(RuntimeError):
     pass
 
 
@@ -130,7 +134,8 @@ class AtomicDao(Generic[T]):
     def select(self,
                where: Optional[str] = None,
                parameters: Optional[Dict[str, Any]] = None,
-               limit: Optional[int] = None) -> Generator[T, None, None]:
+               limit: Optional[int] = None,
+               datastore_session: Optional[DataStoreSession] = None) -> Generator[T, None, None]:
         query = f'SELECT * FROM {self._table_name}'
 
         if where:
@@ -141,14 +146,21 @@ class AtomicDao(Generic[T]):
 
         self._log.debug(f'RUN: {query} (params={parameters})')
 
-        for row in self._datastore.execute(query, parameters):
+        cursor = (
+            datastore_session.execute(query, parameters=parameters)
+            if datastore_session
+            else self._datastore.execute(query, parameters=parameters)
+        )
+
+        for row in cursor:
             # noinspection PyProtectedMember
             yield self.map_row(row._asdict())
 
     def select_one(self,
                    where: Optional[str] = None,
-                   parameters: Optional[Dict[str, Any]] = None) -> Optional[T]:
-        items = [i for i in self.select(where, parameters, limit=1)]
+                   parameters: Optional[Dict[str, Any]] = None,
+                   datastore_session: Optional[DataStoreSession] = None) -> Optional[T]:
+        items = [i for i in self.select(where, parameters, limit=1, datastore_session=datastore_session)]
         if items:
             return items[0]
         else:
@@ -156,7 +168,8 @@ class AtomicDao(Generic[T]):
 
     def delete(self,
                where: Optional[str] = None,
-               parameters: Optional[Dict[str, Any]] = None) -> int:
+               parameters: Optional[Dict[str, Any]] = None,
+               datastore_session: Optional[DataStoreSession] = None) -> int:
         query = f'DELETE FROM {self._table_name}'
 
         if where:
@@ -164,15 +177,21 @@ class AtomicDao(Generic[T]):
 
         self._log.debug(f'RUN: {query} (params={parameters})')
 
-        return self._datastore.execute_without_result(query, parameters)
+        if datastore_session:
+            return datastore_session.execute_without_result(query, parameters)
+        else:
+            return self._datastore.execute_without_result(query, parameters)
 
-    def get(self, id: str) -> T:
+    def get(self, id: str,
+            datastore_session: Optional[DataStoreSession] = None) -> T:
         return self.select_one('id = :id OR name = :id', dict(id=id))
 
-    def add(self, obj: T) -> T:
-        return self.simple_insert(obj)
+    def add(self, obj: T,
+            datastore_session: Optional[DataStoreSession] = None) -> T:
+        return self.simple_insert(obj, datastore_session)
 
-    def simple_insert(self, obj: T) -> T:
+    def simple_insert(self, obj: T,
+                      datastore_session: Optional[DataStoreSession] = None) -> T:
         sql_column_names: List[str] = list()
         sql_column_value_placeholders: List[str] = list()
         sql_params: Dict[str, Any] = dict()
@@ -196,10 +215,10 @@ class AtomicDao(Generic[T]):
 
         self._log.debug(f'RUN: {insert_query} (params={sql_params})')
 
-        # import traceback
-        # traceback.print_stack(limit=500)
-
-        if self._datastore.execute_without_result(insert_query, sql_params) == 0:
+        if datastore_session:
+            if datastore_session.execute_without_result(insert_query, sql_params) == 0:
+                raise InsertError(obj)
+        elif self._datastore.execute_without_result(insert_query, sql_params) == 0:
             raise InsertError(obj)
 
         return obj
@@ -207,7 +226,8 @@ class AtomicDao(Generic[T]):
     def simple_update(self,
                       obj: T,
                       where: Optional[str] = None,
-                      where_params: Optional[Dict[str, Any]] = None) -> T:
+                      where_params: Optional[Dict[str, Any]] = None,
+                      datastore_session: Optional[DataStoreSession] = None) -> T:
         sql_column_names: List[str] = list()
         sql_column_value_placeholders: List[str] = list()
         sql_params: Dict[str, Any] = dict()
@@ -238,7 +258,10 @@ class AtomicDao(Generic[T]):
 
         self._log.debug(f'RUN: {update_query} (params={sql_params})')
 
-        if self._datastore.execute_without_result(update_query, sql_params) == 0:
-            raise InsertError(obj)
+        if datastore_session:
+            if datastore_session.execute_without_result(update_query, sql_params) == 0:
+                raise UpdateError(obj)
+        elif self._datastore.execute_without_result(update_query, sql_params) == 0:
+            raise UpdateError(obj)
 
         return obj

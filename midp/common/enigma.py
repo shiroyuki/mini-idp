@@ -1,5 +1,5 @@
 from base64 import b64encode, b64decode
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Optional
 
 import jwt
 from cryptography.hazmat.primitives import serialization, hashes
@@ -19,8 +19,14 @@ class Enigma:
 
         self._algorithm = 'RS256'
 
-    def decode(self, token: str) -> Dict[str, Any]:
-        return jwt.decode(token, key=self._public_key, algorithms=[self._algorithm])
+    def decode(self, token: str, issuer: Optional[str] = None, audience: Optional[str] = None) -> Dict[str, Any]:
+        return jwt.decode(
+            token,
+            key=self._public_key,
+            algorithms=[self._algorithm],
+            issuer=issuer,
+            audience=audience,
+        )
 
     def encode(self, payload: Dict[str, Any]) -> str:
         return jwt.encode(payload=payload, key=self._private_key, algorithm=self._algorithm)

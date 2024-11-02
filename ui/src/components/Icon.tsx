@@ -5,6 +5,7 @@ interface Prop {
 }
 
 const Icon: React.FC<Prop> = ({ name }) => {
+  // Check https://fonts.google.com/icons for reference
   return (
     <span className="icon material-symbols-rounded">{ name }</span>
   );

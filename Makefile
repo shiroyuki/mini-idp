@@ -1,7 +1,7 @@
-dev-run:
+dev-backend:
 	fastapi dev app.py --port 8081
 
-uv-run:
+dev-backend-uv:
 	uvicorn midp.web:app --host 0.0.0.0 --port 8081
 
 config-default-json:
@@ -12,3 +12,6 @@ ui-build:
 	cd ui && npm run build
 	cd midp/webui && rm -r *
 	cp -rv ui/build/* midp/webui
+
+dev-ui:
+	cd ui && npm run build-dev

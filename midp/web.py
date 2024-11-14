@@ -13,7 +13,8 @@ from midp.log_factory import get_logger_for
 from midp.oauth.handler import oauth_router
 from midp.oauth.models import OpenIDConfiguration
 from midp.snapshot.handler import recovery_router
-from midp.iam.handlers import iam_rest_routers, iam_rpc_router
+from midp.iam.handlers import iam_rest_routers
+from midp.iam.rpc_handlers import iam_rpc_router
 
 app = FastAPI(title=static_info.ARTIFACT_ID, version=static_info.VERSION)
 log = get_logger_for('root:web')

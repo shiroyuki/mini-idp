@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 
 from imagination.decorator.service import Service
 
@@ -6,7 +6,7 @@ from midp.common.enigma import Enigma
 from midp.iam.dao.atomic import AtomicDao, InsertError
 from midp.iam.dao.role import RoleDao
 from midp.iam.models import IAMUser, IAMRole
-from midp.rds import DataStore
+from midp.rds import DataStore, DataStoreSession
 
 
 @Service()
@@ -25,5 +25,5 @@ class UserDao(AtomicDao[IAMUser]):
     def _decrypt_data(self, data: Union[bytes, str]) -> str:
         return self._enigma.decrypt(data).decode()
 
-    def get(self, id: str) -> IAMUser:
+    def get(self, id: str, datastore_session: Optional[DataStoreSession] = None) -> Optional[IAMUser]:
         return self.select_one('id = :id OR name = :id OR email = :id', dict(id=id))

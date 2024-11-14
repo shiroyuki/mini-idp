@@ -1,10 +1,9 @@
-from typing import TypeVar, Type, List, Any, Annotated, Dict
+from typing import TypeVar, Type, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from imagination import container
 
 from midp.common.base_rest_controller import BaseRestController
-from midp.common.web_helpers import authenticate_with_local_token
 from midp.iam.models import IAMOAuthClient, IAMPolicy, IAMRole, IAMScope, IAMUser
 from midp.iam.realm_rest_controller import PolicyRestController, ClientRestController, \
     RoleRestController, ScopeRestController, UserRestController
@@ -67,10 +66,3 @@ iam_rest_routers = [
     create_router('scopes', IAMScope, ScopeRestController),
     create_router('users', IAMUser, UserRestController),
 ]
-
-iam_rpc_router = APIRouter(prefix='/rpc/iam', tags=['rpc:iam'])
-
-@iam_rpc_router.get('/self/profile')
-def get_user_profile(claims: Annotated[Dict[str, Any], Depends(authenticate_with_local_token)]):
-    print(f'PANDA: claims = {claims}')
-    return None

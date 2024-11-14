@@ -134,6 +134,7 @@ class PrivilegeTokenGenerator:
 
         current_time = time()
 
+        # TODO Implement JTI issuing, validation, and invalidation.
         access_claims = dict(sub=subject_id,
                              roles=user.roles,
                              # TODO provide all requested scopes from the policy.

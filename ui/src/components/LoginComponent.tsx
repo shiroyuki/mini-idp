@@ -1,4 +1,4 @@
-import {FormEvent, useState} from "react";
+import {FormEvent, useCallback, useMemo, useState} from "react";
 import style from './LoginComponent.module.css';
 import Icon from "./Icon";
 import {useNavigate, useOutletContext} from "react-router-dom";
@@ -37,6 +37,8 @@ interface AuthenticationResponse {
     already_exists: boolean;
 }
 
+type FormFunctionalityType = "input" | "submission";
+
 const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
     const appState = useOutletContext<AppState>();
     const navigate = useNavigate();
@@ -44,16 +46,35 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const [formData, setFormData] = useState({username: '', password: ''});
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const {name, value} = e.target;
 
         setFormData((prevData) => ({
             ...prevData,
             [name]: value
         }));
-    };
+    }, [formData]);
 
-    const initiateLogin = async (e: FormEvent) => {
+    const formFunctionalities = useMemo<FormFunctionalityType[]>(() => {
+        let canSubmit = false;
+        let canProvideInput = true;
+
+        if (inFlight) {
+            canSubmit = false;
+            canProvideInput = false;
+        } else {
+            if (formData.username.trim().length > 0 && formData.password.trim().length > 0) {
+                canSubmit = true;
+            }
+        }
+
+        return [
+            canSubmit ? "submission" : null,
+            canProvideInput ? "input" : null,
+        ].filter(t => t !== null) as FormFunctionalityType[];
+    }, [formData, inFlight]);
+
+    const initiateLogin = useCallback(async (e: FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -107,14 +128,14 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             }
             setInFlight(false);
         }
-    };
+    }, [formData, setFeedback]);
 
-    const inFlightIndicator = <LinearLoadingAnimation label={"Authenticating..."}/>
+    const inFlightIndicator = <LinearLoadingAnimation label={"Authenticating..."}/>;
 
     return (
         <article className={style.componentContainer}>
             <div className={style.appName}>
-                <LargeAppLogo />
+                <LargeAppLogo/>
             </div>
             <div className={style.deploymentName}>{appState.serviceInfo?.deployment.name}</div>
             {inFlight ? inFlightIndicator : (
@@ -124,12 +145,16 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
                             <>
                                 <h3>Unable to log in</h3>
                                 <p>{feedback.type}: {feedback.message}</p>
-                                <button onClick={ () => {setFeedback(null);} }>
+                                <button onClick={() => {
+                                    setFeedback(null);
+                                }}>
                                     Try again
                                 </button>
                             </>
                         ) : (
-                            <form method="post" action="#" onSubmit={initiateLogin}>
+                            <form method="post"
+                                  action="#"
+                                  onSubmit={formFunctionalities.includes("submission") ? initiateLogin : undefined}>
                                 <div className="field">
                                     <label htmlFor="username">Username or Email Address</label>
                                     <input
@@ -137,6 +162,7 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
                                         id="username"
                                         name="username"
                                         required
+                                        disabled={!formFunctionalities.includes("input")}
                                         value={formData.username}
                                         onChange={handleChange}/>
                                 </div>
@@ -148,12 +174,16 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
                                         id="password"
                                         name="password"
                                         required
+                                        disabled={!formFunctionalities.includes("input")}
                                         value={formData.password}
                                         onChange={handleChange}/>
                                 </div>
 
                                 <div className="actions">
-                                    <button type="submit">Sign in</button>
+                                    <button type="submit"
+                                            disabled={!formFunctionalities.includes("submission")}>
+                                        Sign in
+                                    </button>
                                 </div>
                             </form>
                         )

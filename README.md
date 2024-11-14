@@ -63,3 +63,10 @@ openssl rsa -in private.pem -outform PEM -pubout -out public.pem
 ### OAuth2 on-behalf-of flow
 1. https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-on-behalf-of-flow
 2. https://developer.okta.com/docs/guides/set-up-token-exchange/main/
+
+## Copyright and License Acknowledgements
+
+* FastAPI - © Sebastián Ramírez. Used under MIT license
+* Imagination - © Juti Noppornpitak. Used under MIT license
+* Material Symbols - © Google Inc. Used under Apache 2 license
+* (TBD)

@@ -2,11 +2,6 @@ import AppLogo from "./AppLogo";
 import styles from "./UIFoundation.module.css";
 import {ReactNode} from "react";
 
-export interface NavigationItem {
-    urlPattern: RegExp;
-    children?: NavigationItem[];
-}
-
 export default ({children}: {children: ReactNode}) => {
     return (
         <article className={styles.scaffold}>

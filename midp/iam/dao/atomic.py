@@ -183,7 +183,7 @@ class AtomicDao(Generic[T]):
             return self._datastore.execute_without_result(query, parameters)
 
     def get(self, id: str,
-            datastore_session: Optional[DataStoreSession] = None) -> T:
+            datastore_session: Optional[DataStoreSession] = None) -> Optional[T]:
         return self.select_one('id = :id OR name = :id', dict(id=id))
 
     def add(self, obj: T,

@@ -1,0 +1,57 @@
+.editableText {
+}
+
+.inlineEditableText {
+    display: inline-flex;
+}
+
+.blockEditableText {
+    display: flex;
+}
+
+.editableTextValue {
+    padding: 4px;
+    border: 1px dashed var(--lightGrey);
+}
+
+.editableTextValue:empty {
+    color: var(--grey);
+    background-color: var(--veryLightGrey);
+    border: 1px dashed var(--lightGrey);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.editableTextValue:empty:after {
+    content: "Not defined";
+}
+
+.editableForm {
+    display: flex;
+    flex-direction: row !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.editableForm > div {
+    margin: 0;
+}
+
+.editableFormActions {
+    flex-direction: row !important;
+}
+
+.editableFormActions > button {
+    margin-left: 8px;
+    background-color: transparent;
+    padding: 0;
+    color: #000;
+}
+
+.editableFormActions > button[type="submit"] {
+    color: var(--colourPrimary);
+}
+
+.editableFormActions > button[type="reset"] {
+    color: var(--colourTriadicRed);
+}

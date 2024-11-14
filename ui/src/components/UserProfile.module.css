@@ -1,0 +1,88 @@
+.profileHeader {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.profile {
+}
+
+.dt {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.dd {
+    margin-inline-start: 0;
+    margin-bottom: 16px;
+}
+
+dt.profileName {
+}
+
+dd.profileName {
+}
+
+dt.profileEmail {
+}
+
+dd.profileEmail {
+}
+
+dt.profileFullName {
+}
+
+dd.profileFullName {
+}
+
+dt.profileRoles {
+}
+
+dd.profileRoles {
+}
+
+.profileRoleList {
+    border: 1px solid var(--lightGrey);
+}
+
+.profileRole {
+    border-top: 1px solid var(--lightGrey);
+    list-style: none;
+    padding: 4px 6px;
+
+    display: flex;
+    align-items: center;
+}
+
+.profileRole > input {
+    margin-right: 8px;
+}
+
+.profileRoleList > .profileRole:nth-child(n + 1) {
+    background-color: var(--veryLightGrey);
+}
+
+.headlineButton {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px 4px 4px;
+    margin-left: 8px;
+    font-size: 14px;
+}
+
+.headlineButtonIcon {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+.addRoleButton {
+}
+
+.addRoleButtonIcon {
+}
+
+.removeRolesButton {
+}
+
+.removeRolesButtonIcon {
+}

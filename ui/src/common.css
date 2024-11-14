@@ -9,11 +9,23 @@
 
     --elementCornerRadius: 4px;
 
+    --linkColour: var(--materialPrimaryColour);
+
     /*Material Design Palette*/
-    --materialPrimaryColour: #5ac3e6;
-    --materialSecondaryColour: #e57d5a;
-    --materialAnalogousColour1: #5ae5c3;
-    --materialAnalogousColour2: #5a7de5;
-    --materialTriadicColour1: #7d5ae5;
-    --materialTriadicColour2: #e55ac3;
+    --materialPrimaryColour: #1976d2;
+    --materialSecondaryColour: #d27619;
+    --materialAnalogousColour1: #19d2d2;
+    --materialAnalogousColour2: #1919d2;
+    --materialTriadicColour1: #7619d2;
+    --materialTriadicColour2: #d21976;
+
+    /* https://coolors.co/1b67e0 */
+    --colourPrimary: #1B67E0;
+    --colourComplementary: #DE941B;
+    --colourAnalogousLighter: #1BDED5;
+    --colourAnalogousDarker: #531BDE;
+    --colourTriadicRed: #DE1B66;
+    --colourTriadicGreen: #66DE1B;
+    --colourComplementaryOrange: #DE531B;
+    --colourComplementaryYellow: #DED51B;
 }

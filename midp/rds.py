@@ -93,8 +93,7 @@ class DataStore:
         self._log = get_logger_for_object(self)
         self._engine: Engine = create_engine(
             base_url + '/' + db_name,
-            # echo=verbose_enabled,
-            echo=True,
+            echo=verbose_enabled,
         )
 
     def connect(self) -> Connection:

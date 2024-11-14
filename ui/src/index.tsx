@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
-import {MainDashboardPage} from "./pages/MainDashboardPage";
+import {UserProfilePage} from "./pages/UserProfilePage";
 import LoginComponent from "./components/LoginComponent";
 
 const router = createHashRouter([
@@ -19,7 +19,7 @@ const router = createHashRouter([
       },
       {
         path: '',
-        element: <MainDashboardPage />,
+        element: <UserProfilePage />,
       }
     ]
   },

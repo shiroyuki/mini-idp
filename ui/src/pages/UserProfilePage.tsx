@@ -1,11 +1,10 @@
-import {LinearLoadingAnimation} from "../components/loaders";
 import {AppState} from "../common/app-state";
 import {useNavigate, useOutletContext} from "react-router-dom";
 import Scaffold from "../components/UIFoundation";
-import Icon from "../components/Icon";
 import {useEffect} from "react";
+import {UserProfile} from "../components/UserProfile";
 
-export const MainDashboardPage = () => {
+export const UserProfilePage = () => {
     const appState: AppState = useOutletContext<AppState>();
     const navigate = useNavigate();
 
@@ -29,11 +28,7 @@ export const MainDashboardPage = () => {
 
     return (
         <Scaffold>
-            <h1><Icon name="face"/> {appState.sessionInfo.name}</h1>
-            <dl>
-                <dt>Username</dt>
-                <dd>Username</dd>
-            </dl>
+            <UserProfile />
         </Scaffold>
     );
 };

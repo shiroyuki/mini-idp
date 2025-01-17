@@ -1,4 +1,5 @@
 import asyncio
+import os.path
 from typing import Callable, List, Dict, Any
 from unittest import TestCase
 from urllib.parse import urljoin, urlparse
@@ -8,10 +9,11 @@ import yaml
 from dotenv import load_dotenv
 from requests import Session, Response
 
-from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient
+from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient, WebClientLocalStorageManager
 from midp.common.env_helpers import optional_env
 from midp.iam.models import IAMOAuthClient
 from midp.log_factory import get_logger_for
+from midp.models import GrantType
 from midp.snapshot.models import AppSnapshot
 
 
@@ -82,7 +84,12 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
         cls._test_config = TestConfig.TEST_BASE_CONFIG.model_copy()
 
         cls._client_output = _ClientOutput()
-        cls._client = MiniIDP(TestConfig.TEST_BASE_URL, output=cls._client_output)
+        cls._local_storage_manager = WebClientLocalStorageManager(
+            os.path.join(os.path.dirname(__file__), '.test_client'))
+        cls._client = MiniIDP(TestConfig.TEST_BASE_URL,
+                              resource_url=cls._get_testing_client().audience,
+                              output=cls._client_output,
+                              local_storage_manager=cls._local_storage_manager)
         cls._client.restore(cls._test_config)
         cls.defer_after_all(cls._remove_test_resources)
 
@@ -129,34 +136,48 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
                                 data=dict(username=username, password=password))
 
         if response.status_code != 200:
-            cls._log.error(f"Attempt to authenticate {dict(username=username, password=password)} and received HTTP {response.status_code} {response.text}")
+            cls._log.error(
+                f"Attempt to authenticate {dict(username=username, password=password)} and received HTTP {response.status_code} {response.text}")
             import time
             time.sleep(60)
             raise AssertionError(f'Failed to log in with {dict(username=username, password=password)}')
 
         return response
 
-    def _initiate_client_with_device_code_flow(self):
-        client: IAMOAuthClient = self._get_testing_client()
+    @classmethod
+    def _initiate_client_with_device_code_flow(cls, user_name: str = 'test_admin'):
+        client: IAMOAuthClient = cls._get_testing_client()
 
         def handle_activation(context: Dict[str, Any]):
             parsed_url = urlparse(context['verification_uri'])
             activation_uri = f'{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}'
-            response = self._http_session.post(activation_uri,
-                                               json=dict(user_code=context['user_code'],
-                                                         authorized=True),
-                                               allow_redirects=False)
+            response = cls._http_session.post(activation_uri,
+                                              json=dict(user_code=context['user_code'],
+                                                        authorized=True),
+                                              allow_redirects=False)
             if response.status_code == 307:
-                self._authenticate_as('user_a')
-                response = self._http_session.post(activation_uri,
-                                                   json=dict(user_code=context['user_code'],
-                                                             authorized=True),
-                                                   allow_redirects=False)
-            self.assertEqual(200, response.status_code,
-                             f'The activation request failed. (HTTP {response.status_code}: {response.text})')
-            self.assertTrue(response.json()['authorized'])
+                cls._authenticate_as(user_name)
+                response = cls._http_session.post(activation_uri,
+                                                  json=dict(user_code=context['user_code'],
+                                                            authorized=True),
+                                                  allow_redirects=False)
+            assert 200 == response.status_code, \
+                f'The activation request failed. (HTTP {response.status_code}: {response.text})'
+            response_data = response.json()
+            assert 'authorized' in response_data and response_data['authorized'], \
+                f'The response is invalid. Here is the given data:\n\n{response_data}'
 
-        self._client_output.on('prompt_for_device_authorization', handle_activation)
-        self.defer(lambda: self._client_output.off('prompt_for_device_authorization'))
+        cls._client_output.on('prompt_for_device_authorization', handle_activation)
 
-        self._client.initiate_device_code(client.name, 'http://faux.shiroyuki.com/resource-0')
+        try:
+            cls._client.initiate_device_code(client.name)
+        finally:
+            cls._client_output.off('prompt_for_device_authorization')
+
+    @classmethod
+    def _get_testing_client(cls):
+        return [
+            client
+            for client in cls._test_config.clients
+            if client.name == 'test_app' and GrantType.DEVICE_CODE in client.grant_types
+        ][0]

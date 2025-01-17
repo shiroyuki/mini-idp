@@ -7,10 +7,14 @@ roles:
   - name: role_a
   - name: role_b
 users:
+  - name: test_admin
+    password: test_admin_no_secret
+    email: test_admin@mini-idp.faux.shiroyuki.com
+    roles: [ 'idp.owner' ]
   - name: user_a
     password: alpha
     email: user_a@mini-idp.faux.shiroyuki.com
-    roles: [ role_a ]
+    roles: [ 'role_a' ]
   - name: user_b
     password: bravo
     email: user_b@mini-idp.faux.shiroyuki.com
@@ -19,6 +23,18 @@ users:
     password: charlie
     email: user_c@mini-idp.faux.shiroyuki.com
 clients:
+  - name: 'test_app'
+    secret: '9023a67ef540e3846853a221948660d1'
+    audience: 'http://localhost:8081/'
+    grant_types:
+      - 'urn:ietf:params:oauth:grant-type:device_code'  # device-code flow
+      - 'urn:ietf:params:oauth:grant-type:jwt-bearer'  # on-behalf-of flow
+    scopes:
+      # Common Scopes
+      - 'openid'
+      - 'profile'
+      # Flow-specific Scope
+      - 'offline_access'  # NOTE: Standard scope
   - name: 'app_0'
     secret: '1a1b7bea5d306f249108c1edb559cd74' # openssl rand -hex 16
     audience: 'http://faux.shiroyuki.com/resource-0'

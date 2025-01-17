@@ -118,6 +118,9 @@ class AtomicDao(Generic[T]):
         else:
             return given_value
 
+    def from_dict(self, data: Dict[str, Any]) -> T:
+        return self._model_class(**data)
+
     def map_row(self, row: Dict[str, Any]) -> T:
         """ Map a row from the cursor to a model object """
         data = dict()

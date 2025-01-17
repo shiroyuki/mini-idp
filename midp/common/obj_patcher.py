@@ -22,5 +22,4 @@ class SimpleJsonPatchOperation(BaseModel):
 
 def apply_changes(obj: T, operations: List[SimpleJsonPatchOperation]) -> T:
     patch = jsonpatch.JsonPatch([o.model_dump() for o in operations])
-    print(f"PANDA: obj = {obj}; patch = {patch}")
     return patch.apply(obj)

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from imagination.decorator.service import Service
 
@@ -9,7 +9,7 @@ from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicy, IAMOAuthClient, IAMRole, IAMScope, IAMUser
-from midp.common.base_rest_controller import BaseRestController
+from midp.common.base_rest_controller import BaseRestController, FailedResponse
 
 
 @Service()
@@ -25,13 +25,13 @@ class PolicyRestController(BaseRestController[IAMPolicy]):
     def create(self, obj: IAMPolicy) -> IAMPolicy:
         return super().create(obj)
 
-    def get(self, id: str) -> IAMPolicy:
+    def get(self, id: str) -> Union[IAMPolicy, FailedResponse]:
         return super().get(id)
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMPolicy:
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> Union[IAMPolicy, FailedResponse]:
         return super().patch(id, operations)
 
-    def put(self, id: str, obj: IAMPolicy) -> IAMPolicy:
+    def put(self, id: str, obj: IAMPolicy) -> Union[IAMPolicy, FailedResponse]:
         return super().put(id, obj)
 
     def delete(self, id: str):
@@ -51,13 +51,13 @@ class ClientRestController(BaseRestController[IAMOAuthClient]):
     def create(self, obj: IAMOAuthClient) -> IAMOAuthClient:
         return super().create(obj)
 
-    def get(self, id: str) -> IAMOAuthClient:
+    def get(self, id: str) -> Union[IAMOAuthClient, FailedResponse]:
         return super().get(id)
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMOAuthClient:
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> Union[IAMOAuthClient, FailedResponse]:
         return super().patch(id, operations)
 
-    def put(self, id: str, obj: IAMOAuthClient) -> IAMOAuthClient:
+    def put(self, id: str, obj: IAMOAuthClient) -> Union[IAMOAuthClient, FailedResponse]:
         return super().put(id, obj)
 
     def delete(self, id: str):
@@ -77,13 +77,13 @@ class RoleRestController(BaseRestController[IAMRole]):
     def create(self, obj: IAMRole) -> IAMRole:
         return super().create(obj)
 
-    def get(self, id: str) -> IAMRole:
+    def get(self, id: str) -> Union[IAMRole, FailedResponse]:
         return super().get(id)
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMRole:
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> Union[IAMRole, FailedResponse]:
         return super().patch(id, operations)
 
-    def put(self, id: str, obj: IAMRole) -> IAMRole:
+    def put(self, id: str, obj: IAMRole) -> Union[IAMRole, FailedResponse]:
         return super().put(id, obj)
 
     def delete(self, id: str):
@@ -103,13 +103,13 @@ class ScopeRestController(BaseRestController[IAMScope]):
     def create(self, obj: IAMScope) -> IAMScope:
         return super().create(obj)
 
-    def get(self, id: str) -> IAMScope:
+    def get(self, id: str) -> Union[IAMScope, FailedResponse]:
         return super().get(id)
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMScope:
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> Union[IAMScope, FailedResponse]:
         return super().patch(id, operations)
 
-    def put(self, id: str, obj: IAMScope) -> IAMScope:
+    def put(self, id: str, obj: IAMScope) -> Union[IAMScope, FailedResponse]:
         return super().put(id, obj)
 
     def delete(self, id: str):
@@ -129,13 +129,13 @@ class UserRestController(BaseRestController[IAMUser]):
     def create(self, obj: IAMUser) -> IAMUser:
         return super().create(obj)
 
-    def get(self, id: str) -> IAMUser:
+    def get(self, id: str) -> Union[IAMUser, FailedResponse]:
         return super().get(id)
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMUser:
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> Union[IAMUser, FailedResponse]:
         return super().patch(id, operations)
 
-    def put(self, id: str, obj: IAMUser) -> IAMUser:
+    def put(self, id: str, obj: IAMUser) -> Union[IAMUser, FailedResponse]:
         return super().put(id, obj)
 
     def delete(self, id: str):

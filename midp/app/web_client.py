@@ -5,26 +5,28 @@ from pathlib import Path
 from time import sleep, time
 from typing import TypeVar, Generic, List, Type, Dict, Any, Optional
 from urllib.parse import urljoin, quote_plus
-from uuid import uuid4
 
 import requests
-from jinja2.lexer import OptionalLStrip
+from imagination import container
+from imagination.decorator.service import Service
 from pydantic import BaseModel, Field
-from requests import Response
+from requests import Response, Session
 
 from midp.common.enigma import Enigma
 from midp.common.env_helpers import optional_env
-from midp.snapshot.models import AppSnapshot
-from midp.log_factory import get_logger_for, get_logger_for_object
+from midp.common.obj_patcher import SimpleJsonPatchOperation
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
+from midp.log_factory import get_logger_for, get_logger_for_object
 from midp.models import GrantType
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
+from midp.snapshot.models import AppSnapshot
 
 T = TypeVar('T')
 
 
-def _assert_response(response: Response, status_codes: List[int]):
-    assert response.status_code in status_codes, f'HTTP {response.status_code} from {response.request.method} {response.request.url}: {response.text}'
+def _compute_default_context_name(base_url: str, resource_url: str) -> str:
+    enigma = Enigma()
+    return enigma.compute_hash(f'base_url={base_url};resource_url={resource_url}')
 
 
 class WebClientSession(BaseModel):
@@ -43,8 +45,13 @@ class WebClientConfig(BaseModel):
     contexts: Dict[str, WebClientContextConfig] = Field(default_factory=dict)
 
 
+_DEFAULT_CONTEXT_NAME = 'default'
+
+
+@Service()
 class WebClientLocalStorageManager:
     def __init__(self, storage_dir: Optional[str] = None):
+        self._log = get_logger_for_object(self)
         self._enigma = Enigma()
         self._storage_dir = storage_dir or optional_env('MINI_IDP_CLIENT_STORAGE_DIR', str(Path.home() / ".mini_idp"))
         self._config_file_path = os.path.join(self._storage_dir, 'client.json')
@@ -65,7 +72,7 @@ class WebClientLocalStorageManager:
 
     def save_config(self, config: WebClientConfig) -> None:
         with open(self._config_file_path, 'w') as f:
-            json.dump(config.model_dump(), f)
+            json.dump(config.model_dump(), f, indent=2, sort_keys=True)
 
     def set_current_context(self, context: Optional[str]):
         config = self.load_config()
@@ -76,18 +83,23 @@ class WebClientLocalStorageManager:
         config = self.load_config()
         return config.current_context
 
-    def set_context(self, context: WebClientContextConfig, context_name: Optional[str] = None) -> None:
+    def set_context(self,
+                    context: WebClientContextConfig,
+                    context_name: Optional[str] = None,
+                    switch_immediately: bool = False) -> None:
         config = self.load_config()
-
-        current_context_name = context_name or config.current_context or 'default'
-
+        current_context_name = context_name or config.current_context or _DEFAULT_CONTEXT_NAME
         config.contexts[current_context_name] = context
+
+        if switch_immediately:
+            config.current_context = current_context_name
+
         self.save_config(config)
 
     def get_context(self, context_name: Optional[str] = None) -> Optional[WebClientContextConfig]:
         config = self.load_config()
 
-        current_context_name = context_name or config.current_context or 'default'
+        current_context_name = context_name or config.current_context or _DEFAULT_CONTEXT_NAME
 
         return config.contexts.get(current_context_name)
 
@@ -102,42 +114,112 @@ class WebClientLocalStorageManager:
 
     def save_session(self, session: WebClientSession, context_name: Optional[str] = None) -> None:
         with open(self._get_session_path(context_name), 'w') as f:
-            json.dump(session.model_dump(), f)
+            json.dump(session.model_dump(), f, indent=2, sort_keys=True)
 
     def _get_session_path(self, context_name: Optional[str] = None) -> str:
         config = self.load_config()
-        current_context_name = context_name or config.current_context
+        current_context_name = context_name or config.current_context or _DEFAULT_CONTEXT_NAME
         return os.path.join(self._session_dir_path, self._enigma.compute_hash(current_context_name) + '.json')
+
+
+class APIResponseError(RuntimeError):
+    def __init__(self, response: Response):
+        self.__request_method = response.request.method
+        self.__request_url = response.request.url
+        self.__response_status = response.status_code
+        self.__response_body = response.text
+
+    @property
+    def request_method(self):
+        return self.__request_method
+
+    @property
+    def request_url(self):
+        return self.__request_url
+
+    @property
+    def response_status(self):
+        return self.__response_status
+
+    @property
+    def response_body(self):
+        return self.__response_body
+
+    def __str__(self):
+        return f'{self.request_method} {self.request_url}: HTTP {self.response_status}: {self.response_body}'
+
+
+class ClientError(APIResponseError):
+    pass
+
+
+class ServerError(APIResponseError):
+    pass
+
+
+def _assert_response(response: Response, status_codes: List[int]):
+    returning_status_code = response.status_code
+    if returning_status_code not in status_codes:
+        if returning_status_code < 500:
+            raise ClientError(response)
+        else:
+            raise ServerError(response)
 
 
 class RestAPIClient(Generic[T]):
     def __init__(self,
                  base_url: str,
+                 resource_url: Optional[str],
                  model_class: Type[T],
                  local_storage_manager: WebClientLocalStorageManager):
         self._log = get_logger_for(f'REST:{model_class.__name__}')
         self._base_url = base_url
+        self._resource_url = resource_url
         self._model_class = model_class
         self._local_storage_manager = local_storage_manager
 
         if not self._base_url.endswith(r'/'):
             self._base_url += '/'
 
+    def _new_session(self) -> Session:
+        http_session: Session = Session()
+        http_session.headers.update({'Content-Type': 'application/json'})
+
+        context_name = _compute_default_context_name(self._base_url, self._resource_url)
+
+        client_session = self._local_storage_manager.load_session(context_name=context_name)
+
+        if client_session:
+            http_session.headers.update({'Authorization': f'Bearer {client_session.access_token}'})
+
+        return http_session
+
     def list(self) -> List[T]:
-        response = requests.get(self._base_url)
+        response = self._new_session().get(self._base_url)
 
         _assert_response(response, [200])
 
         return [self._model_class(**i) for i in response.json()]
 
     def get(self, id: str) -> T:
-        response = requests.get(self._base_url + id)
+        response = self._new_session().get(self._base_url + id)
         _assert_response(response, [200])
-        obj = self._model_class(**response.json())
-        return obj
+        return self._model_class(**response.json())
+
+    def create(self, data: T) -> T:
+        typed_data: BaseModel = data
+        response = self._new_session().post(self._base_url, json=data.model_dump())
+        _assert_response(response, [200])
+        return self._model_class(**response.json())
+
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]):
+        assert operations and len(operations) > 0, 'There must be at least one operation.'
+
+        response = self._new_session().put(self._base_url + id, json=[o.model_dump() for o in operations])
+        _assert_response(response, [200])
 
     def delete(self, id: str) -> bool:
-        response = requests.delete(urljoin(self._base_url, id))
+        response = self._new_session().delete(urljoin(self._base_url, id))
         status_code = response.status_code
 
         _assert_response(response, [200, 410])
@@ -180,7 +262,7 @@ class MiniIDPConfigurer:
     def __init__(self, local_storage_manager: WebClientLocalStorageManager):
         self._local_storage_manager = local_storage_manager
 
-    def use(self, context_name: Optional[str] = None) -> WebClientContextConfig:
+    def use(self, context_name: Optional[str] = None) -> Optional[WebClientContextConfig]:
         self._local_storage_manager.set_current_context(context_name)
         if context_name:
             return self._local_storage_manager.get_context(context_name)
@@ -206,7 +288,7 @@ class MiniIDP:
         self._resource_url = resource_url
         self._output = output or ClientOutput()
         self._openid_config: Optional[OpenIDConfiguration] = None
-        self._local_storage_manager = local_storage_manager or WebClientLocalStorageManager()
+        self._local_storage_manager = local_storage_manager or container.get(WebClientLocalStorageManager)
 
         assert self._output, 'No output'
 
@@ -218,26 +300,31 @@ class MiniIDP:
         # REST API Clients
         self._clients: RestAPIClient[IAMOAuthClient] = RestAPIClient(
             urljoin(self._base_url, 'rest/clients'),
+            self._resource_url,
             IAMOAuthClient,
             self._local_storage_manager
         )
         self._policies: RestAPIClient[IAMPolicy] = RestAPIClient(
             urljoin(self._base_url, 'rest/policies'),
+            self._resource_url,
             IAMPolicy,
             self._local_storage_manager
         )
         self._roles: RestAPIClient[IAMRole] = RestAPIClient(
             urljoin(self._base_url, 'rest/roles'),
+            self._resource_url,
             IAMRole,
             self._local_storage_manager
         )
         self._scopes: RestAPIClient[IAMScope] = RestAPIClient(
             urljoin(self._base_url, 'rest/scopes'),
+            self._resource_url,
             IAMScope,
             self._local_storage_manager
         )
         self._users: RestAPIClient[IAMUser] = RestAPIClient(
             urljoin(self._base_url, 'rest/users'),
+            self._resource_url,
             IAMUser,
             self._local_storage_manager
         )
@@ -284,11 +371,11 @@ class MiniIDP:
             self._openid_config = OpenIDConfiguration(**response.json())
         return self._openid_config
 
-    def initiate_device_code(self, client_id: str, resource_url: Optional[str] = None):
+    def initiate_device_code(self, client_id: str):
         openid_config = self.get_openid_configuration()
 
         query_string = ''
-        actual_resource_url = resource_url or self._resource_url
+        actual_resource_url = self._resource_url
 
         if actual_resource_url:
             query_string = f'?resource={quote_plus(actual_resource_url)}'
@@ -335,7 +422,7 @@ class MiniIDP:
 
             if token_exchange_response.status_code == 200:
                 token_exchange = TokenExchangeResponse(**token_exchange_response.json())
-                context_name = self._enigma.compute_hash(f'base_url={self._base_url};resource_url={self._resource_url}')
+                context_name = _compute_default_context_name(base_url=self._base_url, resource_url=self._resource_url)
 
                 self._local_storage_manager.set_context(
                     context_name=context_name,
@@ -343,6 +430,7 @@ class MiniIDP:
                         base_url=self._base_url,
                         resource_url=actual_resource_url,
                     ),
+                    switch_immediately=True,
                 )
 
                 self._local_storage_manager.save_session(

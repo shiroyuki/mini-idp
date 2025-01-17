@@ -1,3 +1,4 @@
+.idea-pycharm
 *.pem
 poetry.lock
 .idea

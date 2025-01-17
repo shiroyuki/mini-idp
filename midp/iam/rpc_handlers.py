@@ -13,7 +13,6 @@ iam_rpc_router = APIRouter(prefix='/rpc/iam', tags=['rpc:iam'])
 
 @iam_rpc_router.get('/self/profile')
 def get_user_profile(response: Response, claims: Annotated[Dict[str, Any], Depends(authenticate_with_local_token)]) -> Optional[IAMUserReadOnly]:
-    print(f'PANDA: claims = {claims}')
     user_id = claims['sub']
     user_dao: UserDao = container.get(UserDao)
     user = user_dao.get(user_id)

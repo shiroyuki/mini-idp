@@ -15,3 +15,6 @@ ui-build:
 
 dev-ui:
 	cd ui && npm run build-dev
+
+dev-test:
+	python3 -m unittest discover -v

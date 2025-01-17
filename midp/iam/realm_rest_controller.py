@@ -2,6 +2,7 @@ from typing import List
 
 from imagination.decorator.service import Service
 
+from midp.common.obj_patcher import SimpleJsonPatchOperation
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
@@ -27,8 +28,8 @@ class PolicyRestController(BaseRestController[IAMPolicy]):
     def get(self, id: str) -> IAMPolicy:
         return super().get(id)
 
-    def patch(self, id: str, obj: IAMPolicy) -> IAMPolicy:
-        return super().patch(id, obj)
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMPolicy:
+        return super().patch(id, operations)
 
     def put(self, id: str, obj: IAMPolicy) -> IAMPolicy:
         return super().put(id, obj)
@@ -53,8 +54,8 @@ class ClientRestController(BaseRestController[IAMOAuthClient]):
     def get(self, id: str) -> IAMOAuthClient:
         return super().get(id)
 
-    def patch(self, id: str, obj: IAMOAuthClient) -> IAMOAuthClient:
-        return super().patch(id, obj)
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMOAuthClient:
+        return super().patch(id, operations)
 
     def put(self, id: str, obj: IAMOAuthClient) -> IAMOAuthClient:
         return super().put(id, obj)
@@ -79,8 +80,8 @@ class RoleRestController(BaseRestController[IAMRole]):
     def get(self, id: str) -> IAMRole:
         return super().get(id)
 
-    def patch(self, id: str, obj: IAMRole) -> IAMRole:
-        return super().patch(id, obj)
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMRole:
+        return super().patch(id, operations)
 
     def put(self, id: str, obj: IAMRole) -> IAMRole:
         return super().put(id, obj)
@@ -105,8 +106,8 @@ class ScopeRestController(BaseRestController[IAMScope]):
     def get(self, id: str) -> IAMScope:
         return super().get(id)
 
-    def patch(self, id: str, obj: IAMScope) -> IAMScope:
-        return super().patch(id, obj)
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMScope:
+        return super().patch(id, operations)
 
     def put(self, id: str, obj: IAMScope) -> IAMScope:
         return super().put(id, obj)
@@ -131,8 +132,8 @@ class UserRestController(BaseRestController[IAMUser]):
     def get(self, id: str) -> IAMUser:
         return super().get(id)
 
-    def patch(self, id: str, obj: IAMUser) -> IAMUser:
-        return super().patch(id, obj)
+    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]) -> IAMUser:
+        return super().patch(id, operations)
 
     def put(self, id: str, obj: IAMUser) -> IAMUser:
         return super().put(id, obj)

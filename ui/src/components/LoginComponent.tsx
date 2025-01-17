@@ -5,20 +5,15 @@ import {useNavigate, useOutletContext} from "react-router-dom";
 import {AppState} from "../common/app-state";
 import {LinearLoadingAnimation} from "./loaders";
 import LargeAppLogo from "./LargeAppLogo";
+import classNames from "classnames";
 
 interface LoginComponentProps {
 }
 
 interface Feedback {
     type: string;
-    message?: string | null;
+    message?: AuthenticationResponse | string | null;
 }
-
-interface LoginComponentState {
-    inFlight: boolean;
-    feedback: Feedback | null;
-}
-
 interface Principle {
     id: string
     name: string
@@ -118,12 +113,12 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             if (response.status < 500) {
                 setFeedback({
                     type: "api.error",
-                    message: `${response.status}: ${responseBody}`,
+                    message: JSON.parse(responseBody),
                 });
             } else {
                 setFeedback({
                     type: "connection.error",
-                    message: `${response.status}: ${responseBody}`,
+                    message: responseBody,
                 });
             }
             setInFlight(false);
@@ -131,6 +126,11 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
     }, [formData, setFeedback]);
 
     const inFlightIndicator = <LinearLoadingAnimation label={"Authenticating..."}/>;
+    const containerClasses = ["form-container", style.formContainer];
+
+    if (feedback) {
+        containerClasses.push("feedback-container");
+    }
 
     return (
         <article className={style.componentContainer}>
@@ -139,12 +139,16 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             </div>
             <div className={style.deploymentName}>{appState.serviceInfo?.deployment.name}</div>
             {inFlight ? inFlightIndicator : (
-                <div className={style.formContainer + " form-container"}>
+                <div className={classNames(containerClasses)}>
                     {feedback
                         ? (
                             <>
                                 <h3>Unable to log in</h3>
-                                <p>{feedback.type}: {feedback.message}</p>
+                                <p>{
+                                    (feedback.message && feedback.message.error)
+                                    ? <>{feedback.message.error_description || feedback.message.error}</>
+                                    : <>{feedback.type}: {feedback.message || "Unknown"}</>
+                                }</p>
                                 <button onClick={() => {
                                     setFeedback(null);
                                 }}>

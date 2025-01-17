@@ -1,0 +1,59 @@
+.actions {
+    display: flex;
+    flex-direction: row;
+
+    border-top: 1px solid var(--lightGrey);
+    border-bottom: 1px dashed var(--lightGrey);
+    padding: 4px;
+
+    button {
+        display: flex;
+        align-items: center;
+        /*border-radius: 0;*/
+        background-color: transparent;
+        color: var(--darkGrey);
+
+        &:hover {
+            color: #000;
+        }
+    }
+
+    button[type="submit"] {
+        &:hover {
+            background-color: var(--colourPrimary);
+            color: #fff;
+        }
+    }
+}
+
+.controller {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+
+    label {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 8px 0;
+    }
+
+    input[type="text"] {
+        margin-bottom: 16px;
+    }
+
+    input[disabled] {
+        border: 1px solid var(--lightGrey);
+    }
+}
+
+.itemList {
+    list-style: none;
+
+    li {
+        display: flex;
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+    }
+}

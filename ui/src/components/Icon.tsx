@@ -3,7 +3,7 @@ import styles from "./Icon.module.css";
 import classNames from "classnames";
 
 interface Prop {
-  name: string;
+  name: "arrow_back" | string;
   classes?: string[];
 }
 

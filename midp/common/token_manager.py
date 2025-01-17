@@ -127,10 +127,10 @@ class PrivilegeTokenGenerator:
                     raise NotImplementedError()
                 ...
 
-        print(f'PANDA: policies = {policies}')
-
-        if not policies:
-            raise TokenGenerationError('access_denied')
+        # print(f'PANDA: policies = {policies}')
+        #
+        # if not policies:
+        #     raise TokenGenerationError('access_denied')
 
         current_time = time()
 

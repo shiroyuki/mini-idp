@@ -2,7 +2,7 @@ from typing import Optional
 
 from imagination import container
 
-from midp.common.env_helpers import SELF_REFERENCE_URI, BOOTING_OPTIONS, required_env
+from midp.common.env_helpers import SELF_REFERENCE_URI, BOOTING_OPTIONS, required_env, optional_env
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
@@ -38,6 +38,8 @@ def restore_from_snapshot(main_config: AppSnapshot, session: Optional[DataStoreS
 
     for policy in main_config.policies:
         policy_dao.add(policy, datastore_session=session)
+
+    session.commit()
 
 
 def export_snapshot() -> AppSnapshot:
@@ -91,6 +93,7 @@ if BOOTING_OPTIONS:
         ],
         users=[
             IAMUser(
+                id=optional_env('MINI_IDP_BOOTSTRAP_OWNER_USER_ID', default=None),
                 name=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_NAME'),
                 email=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_EMAIL'),
                 password=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_PASSWORD'),

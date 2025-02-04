@@ -29,6 +29,21 @@ class BaseRestController(Generic[TypeParameter]):
             ).model_dump_json(indent=2)
         )
 
+    def _get_scopes_for_list(self) -> List[str]:
+        raise NotImplementedError()
+
+    def _get_scopes_for_list(self) -> List[str]:
+        raise NotImplementedError()
+
+    def _get_scopes_for_list(self) -> List[str]:
+        raise NotImplementedError()
+
+    def _get_scopes_for_list(self) -> List[str]:
+        raise NotImplementedError()
+
+    def _run_additional_checks(self):
+        pass
+
     def list(self) -> List[TypeParameter]:
         """ List resources """
         return [i for i in self._dao.select()]

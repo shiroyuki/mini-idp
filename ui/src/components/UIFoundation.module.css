@@ -26,6 +26,8 @@
             display: block;
             padding: 8px 12px;
             margin: 0 12px;
+            text-decoration: none;
+            color: var(--black);
 
             &:hover {
                 background-color: var(--veryLightGrey);

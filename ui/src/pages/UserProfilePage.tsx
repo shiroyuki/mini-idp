@@ -1,6 +1,6 @@
 import {AppState} from "../common/app-state";
-import {useNavigate, useOutletContext} from "react-router-dom";
-import Scaffold from "../components/UIFoundation";
+import {useLocation, useNavigate, useOutletContext} from "react-router-dom";
+import UIFoundation from "../components/UIFoundation";
 import {useEffect} from "react";
 import {UserProfile} from "../components/UserProfile";
 
@@ -27,8 +27,8 @@ export const UserProfilePage = () => {
     }, [appState.status]);
 
     return (
-        <Scaffold>
+        <UIFoundation>
             <UserProfile />
-        </Scaffold>
+        </UIFoundation>
     );
 };

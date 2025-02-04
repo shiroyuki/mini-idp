@@ -84,6 +84,7 @@ export const UserProfile = ({id}: { id?: string }) => {
                 label: "ID",
                 required: true,
                 readOnly: true,
+                hidden: true,
                 style: {
                     fontFamily: "monospace",
                 }

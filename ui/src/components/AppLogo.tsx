@@ -10,7 +10,11 @@ export default () => {
 
             <div className={styles.appVersion}>
                 <span></span>
-                <span>{appState.serviceInfo.release.version}</span>
+                {
+                    appState
+                        ? <span>{appState.serviceInfo.release.version}</span>
+                        : <span>(x x)</span>
+                }
             </div>
         </div>
     );

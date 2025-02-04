@@ -3,6 +3,7 @@ import React, {CSSProperties, useCallback, useEffect, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
 import Icon from "./Icon";
+import {FormError} from "../common/local-models";
 
 type dataType = "string" | "integer" | "float" | "boolean" | "object";
 
@@ -212,7 +213,7 @@ type ResourceProp = {
     fields: Schema[];
     initialMode?: "reader" | "editor";
     onCancel?: () => void;
-    onSubmit?: () => void;
+    onSubmit?: () => FormError[] | void;
     onUpdate?: (key: string, value: any) => any;
 }
 
@@ -226,10 +227,16 @@ export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onS
     const handleFormSubmission = useCallback(
         () => {
             if (onSubmit) {
-                onSubmit();
+                const errors = onSubmit() || [];
+                if (errors.length === 0) {
+                    setMode("reader");
+                    console.log("Foo");
+                } else {
+                    // TODO: Implement the form error feedback.
+                }
             }
         },
-        [onSubmit]
+        [onSubmit, setMode]
     );
 
     const abortEditing = useCallback(() => {
@@ -240,7 +247,7 @@ export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onS
     }, [onCancel, setMode]);
 
     return (
-        <form onSubmit={handleFormSubmission}>
+        <form className={styles.resourceForm} onSubmit={handleFormSubmission}>
             {
                 onUpdate && (
                     <div className={styles.actions}>
@@ -254,7 +261,6 @@ export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onS
                                 : (
                                     <>
                                         <button type={"reset"} onClick={abortEditing} title={"Cancel"}><Icon name={"arrow_back"}/></button>
-                                        <button type={"submit"}>{data ? "Save" : "Create"}</button>
                                     </>
                                 )
                         }
@@ -276,6 +282,11 @@ export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onS
                     }
                 </div>
             </div>
+            {mode === "editor" && (
+                <div className={styles.secondaryActions}>
+                    <button type={"submit"}>{data ? "Save" : "Create"}</button>
+                </div>
+            )}
         </form>
     );
 }

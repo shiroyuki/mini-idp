@@ -114,9 +114,7 @@ function App() {
         setOverallStatus(appState.status);
 
         return appState;
-    }, [
-        bootingStateMap,
-    ]);
+    }, [bootingStateMap, bootingStateMap.sessionInfo]);
 
     const progress = 100.0 * (appState.completeTaskCount + appState.errorTaskCount) / appState.totalTaskCount;
 

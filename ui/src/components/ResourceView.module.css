@@ -1,10 +1,12 @@
-.actions {
+.resourceForm {
+    border: 1px solid var(--lightGrey);
+}
+
+.actions, .secondaryActions {
     display: flex;
     flex-direction: row;
 
-    border-top: 1px solid var(--lightGrey);
-    border-bottom: 1px dashed var(--lightGrey);
-    padding: 4px;
+    margin-top: 0;
 
     button {
         display: flex;
@@ -19,11 +21,27 @@
     }
 
     button[type="submit"] {
+        border: 1px solid var(--lightGrey);
+
         &:hover {
             background-color: var(--colourPrimary);
             color: #fff;
         }
     }
+}
+
+.actions {
+    border-bottom: 1px solid var(--lightGrey);
+    padding: 4px;
+}
+
+.secondaryActions {
+    border-top: 1px solid var(--lightGrey);
+    padding: 16px;
+}
+
+.controllers {
+    padding: 0 16px;
 }
 
 .controller {

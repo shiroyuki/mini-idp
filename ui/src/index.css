@@ -96,7 +96,7 @@ button {
     color: var(--grey);
   }
 
-  &.primary {
+  &[type="submit"], &.primary {
     color: #fff;
     background-color: var(--colourPrimary);
   }
@@ -144,7 +144,6 @@ form {
   & > div {
     display: flex;
     flex-direction: column;
-    margin-top: 1rem;
   }
 
   & > .field label {
@@ -166,4 +165,47 @@ form {
   .form-container {
     /* */
   }
+}
+
+.data-table-container {
+  display: flex;
+  flex-direction: column;
+
+  .data-table {
+    flex: 1;
+    border-spacing: 0;
+    border-top: 1px solid var(--darkGrey);
+
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--darkGrey);
+    }
+
+    td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--grey);
+    }
+
+    td:empty::before {
+      content: "null";
+      color: var(--grey);
+    }
+
+    tr:nth-child(2n + 1) td {
+      background-color: var(--veryLightGrey);
+    }
+
+    tr:nth-child(2n) td {
+      background-color: var(--white);
+    }
+  }
+}
+
+.foundation-tag {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: var(--lightGrey);
 }

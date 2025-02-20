@@ -15,7 +15,7 @@ from starlette.responses import Response, RedirectResponse
 
 from midp.common.key_storage import KeyStorage, Entry
 from midp.common.session_manager import Session
-from midp.common.token_manager import PrivilegeTokenGenerator, TokenSet, TokenGenerationError
+from midp.common.token_manager import TokenManager, TokenSet, TokenGenerationError
 from midp.common.web_helpers import restore_session
 from midp.iam.models import PredefinedScope, IAMPolicySubject
 from midp.log_factory import get_logger_for
@@ -194,7 +194,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                          request: Request,
                          response: Response) -> TokenExchangeResponse:
     access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
-    token_manager: PrivilegeTokenGenerator = container.get(PrivilegeTokenGenerator)
+    token_manager: TokenManager = container.get(TokenManager)
 
     if grant_type == GrantType.DEVICE_CODE:
         await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
@@ -216,7 +216,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                                                       kind='user')
 
             try:
-                token_set: TokenSet = await asyncio.to_thread(token_manager.generate,
+                token_set: TokenSet = await asyncio.to_thread(token_manager.create_token_set,
                                                               iam_policy_subject,
                                                               resource_url,
                                                               requested_scopes)

@@ -4,11 +4,12 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import {createHashRouter, RouterProvider} from 'react-router-dom';
-import {UserProfilePage} from "./pages/UserProfilePage";
 import LoginComponent from "./components/LoginComponent";
-import {UserListPage} from './pages/UserListPage';
 import UIFoundation from "./components/UIFoundation";
 import {ResourceManagerPage} from "./pages/ResourceManagerPage";
+import {IAM_USER_SCHEMA} from "./common/resource-schema";
+import {FrontPage} from "./pages/FrontPage";
+import {MyProfilePage} from "./pages/SettingsPage";
 
 const router = createHashRouter([
     {
@@ -16,9 +17,9 @@ const router = createHashRouter([
         element: <App/>,
         errorElement: (
             <UIFoundation>
-                <h1 style={{textTransform: "uppercase", fontSize: "2rem"}}>Not available</h1>
+                <h1 style={{textTransform: "uppercase", fontSize: "2rem", paddingTop: "24px"}}>Not available</h1>
                 <p style={{margin: "1rem 0"}}>
-                    The user interface you have requested is sadly <b>unavailable</b>.
+                    If you think this is our mistake, please file an issue on <a href="https://github.com/shiroyuki/mini-idp/issues">GitHub</a>.
                 </p>
             </UIFoundation>
         ),
@@ -30,12 +31,37 @@ const router = createHashRouter([
             {
                 path: 'users',
                 // @ts-ignore
-                element: <ResourceManagerPage baseUrl={ "/rest/users" } listPage={ {title: "Users"} }/>,
+                element: (
+                    <ResourceManagerPage
+                        baseBackendUri={"/rest/users"}
+                        baseFrontendUri={"/users"}
+                        schema={IAM_USER_SCHEMA}
+                        listPage={{title: "Users"}}
+                    />
+                ),
+                children: [
+                    {
+                        path: ":id",
+                        element: (
+                            <ResourceManagerPage
+                                baseBackendUri={"/rest/users"}
+                                baseFrontendUri={"/users"}
+                                schema={IAM_USER_SCHEMA}
+                                listPage={{title: "Users"}}
+                            />
+                        )
+                    }
+                ]
+            },
+            {
+                path: 'account/profile',
+                // @ts-ignore
+                element: <MyProfilePage/>,
             },
             {
                 path: '',
                 // @ts-ignore
-                element: <UserProfilePage/>,
+                element: <FrontPage/>,
             },
         ]
     },

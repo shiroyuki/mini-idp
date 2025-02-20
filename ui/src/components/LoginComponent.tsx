@@ -48,7 +48,7 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             ...prevData,
             [name]: value
         }));
-    }, [formData]);
+    }, []);
 
     const formFunctionalities = useMemo<FormFunctionalityType[]>(() => {
         let canSubmit = false;
@@ -67,7 +67,7 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             canSubmit ? "submission" : null,
             canProvideInput ? "input" : null,
         ].filter(t => t !== null) as FormFunctionalityType[];
-    }, [formData, inFlight]);
+    }, [inFlight, formData.username, formData.password]);
 
     const initiateLogin = useCallback(async (e: FormEvent) => {
         e.preventDefault();
@@ -123,7 +123,7 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
             }
             setInFlight(false);
         }
-    }, [formData, setFeedback]);
+    }, [setFeedback, formData.password, formData.username, appState, navigate]);
 
     const inFlightIndicator = <LinearLoadingAnimation label={"Authenticating..."}/>;
     const containerClasses = ["form-container", style.formContainer];

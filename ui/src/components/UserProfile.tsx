@@ -1,41 +1,37 @@
 import {LinearLoadingAnimation} from "./loaders";
-import Icon from "./Icon";
-import React, {ChangeEvent, useCallback, useEffect, useMemo, useState} from "react";
-import styles from "./UserProfile.module.css";
-import classNames from "classnames";
-import {ResourceView, Schema} from "./ResourceView";
+import React, {useCallback, useEffect, useState} from "react";
+import {ResourceView, ResourceViewMode} from "./ResourceView";
 import {IAMRole, IAMUserReadOnly} from "../common/models";
+import {UIFoundationHeader} from "./UIFoundationHeader";
+import {http} from "../common/http-client";
+import {IAM_USER_SCHEMA} from "../common/resource-schema";
 
-export const UserProfile = ({id}: { id?: string }) => {
+export const UserProfile = ({id, mode}: { id?: string, mode?: ResourceViewMode }) => {
     const targetResourceId = id ?? null;
     const [isDirty, setDirty] = useState(false);
+    const [currentMode, setCurrentMode] = useState<ResourceViewMode | undefined>(mode || "reader");
     const [targetResource, setTargetResource] = useState<IAMUserReadOnly | undefined | null>(undefined);
+    const resourceSchema = IAM_USER_SCHEMA;
 
     const loadResource = useCallback(() => {
-        fetch(
-            targetResourceId === null ? '/rpc/iam/self/profile' : `/rest/users/${targetResourceId}`,
-            {
-                method: "get",
-                headers: {
-                    Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
+        http.simpleSend<IAMUserReadOnly>("get", targetResourceId === null ? '/rpc/iam/self/profile' : `/rest/users/${targetResourceId}`)
+            .then(
+                (data) => {
+                    setTargetResource(data);
+                    setDirty(false)
                 },
-            }
-        ).then(async (response) => {
-            if (response.status === 200) {
-                setTargetResource(await response.json());
-            } else {
-                // TODO Handle HTTP 401, 403, 404, 5XX.
-                console.error(`No clean handling for this response:\n\nHTTP ${response.status}: ${await response.text()}`)
-                setTargetResource(null);
-            }
-            setDirty(false)
-        });
+                (err) => {
+                    console.warn(`Encountered unexpected error: ${err}`);
+                    setTargetResource(null);
+                    setDirty(false)
+                }
+            )
     }, []);
 
-    const updateRemoteCopy = useCallback(() => {
+    const updateRemoteCopy = useCallback(async () => {
         if (!targetResource) {
-            console.warn("The resource is not loaded.");
-            return;
+            console.warn("Invalid state to update");
+            return null;
         }
 
         const patch = resourceSchema.filter(field => !field.readOnly && !field.hidden)
@@ -48,98 +44,26 @@ export const UserProfile = ({id}: { id?: string }) => {
                 }
             });
 
-        fetch(
-            `/rest/users/${targetResource.id}`,
-            {
-                method: "put",
-                headers: {
-                    Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(patch),
-            }
-        ).then(async (response) => {
-            if (response.status === 200) {
-                setTargetResource(await response.json());
-            } else {
-                // TODO Handle HTTP 401, 403, 404, 5XX.
-                console.error(`No clean handling for this response:\n\nHTTP ${response.status}: ${await response.text()}`)
-                setTargetResource(null);
-                throw new Error("Update failed");
-            }
-            setDirty(false)
-        });
-    }, [targetResource]);
+        setCurrentMode("writing")
+
+        try {
+            const data = await http.simpleSend<IAMUserReadOnly>("put", `/rest/users/${targetResource.id}`, {json: patch});
+            setTargetResource(data);
+            setDirty(false);
+            setCurrentMode("reader");
+            return data;
+        } catch (error) {
+            console.warn(`Encountered unexpected error: ${error}`);
+            setCurrentMode("editor");
+            return null;
+        }
+    }, [targetResource, resourceSchema]);
 
     useEffect(() => {
         if (targetResource === undefined) {
             loadResource();
         }
     }, [id]);
-
-    const resourceSchema: Schema[] = useMemo(() => {
-        return [
-            {
-                title: "id",
-                label: "ID",
-                required: true,
-                readOnly: true,
-                hidden: true,
-                style: {
-                    fontFamily: "monospace",
-                }
-            },
-            {
-                title: "name",
-                label: "Username",
-                required: true,
-            },
-            {
-                title: "email",
-                label: "E-mail Address",
-                required: true,
-            },
-            {
-                title: "full_name",
-                label: "Full Name",
-                required: true,
-            },
-            {
-                title: "roles",
-                label: "Roles",
-                required: true,
-                items: {
-                    type: "string",
-                },
-                listRendering: {
-                    list: "all",
-                    load: async () => {
-                        const getRolesResponse = await fetch(
-                            '/rest/roles/',
-                            {
-                                method: "get",
-                                headers: {
-                                    Accept: "application/json",
-                                }
-                            }
-                        );
-                        const fetchedRoles = await getRolesResponse.json() as IAMRole[];
-                        return fetchedRoles;
-                    },
-                    transform: (item: any) => {
-                        const typedItem = item as IAMRole;
-                        const assignedRoles = targetResource?.roles || [];
-                        const checked = assignedRoles.includes(typedItem.name as string);
-                        return {
-                            checked: checked,
-                            label: typedItem.description ? `${typedItem.name} - ${typedItem.description}` : typedItem.name,
-                            value: typedItem.name as string,
-                        };
-                    }
-                }
-            },
-        ]
-    }, [targetResource?.roles]);
 
     const updateLocalCopy = useCallback((key: string, value: any) => {
         setTargetResource(prevState => {
@@ -157,6 +81,8 @@ export const UserProfile = ({id}: { id?: string }) => {
         }
     }, [loadResource, isDirty]);
 
+    const isResourceDirty = useCallback(() => isDirty, [isDirty]);
+
     if (targetResource === undefined) {
         return <LinearLoadingAnimation
             label={targetResourceId === null ? "Loading your profile" : `Accessing User ${targetResourceId}`}
@@ -169,13 +95,14 @@ export const UserProfile = ({id}: { id?: string }) => {
     } else {
         return (
             <>
-                <h1 className={styles.profileHeader}>
-                    {targetResourceId === null ? "Your Profile" : (targetResource.full_name || targetResource.name)}
-                </h1>
+                <UIFoundationHeader
+                    navigation={[{label: targetResourceId === null ? "Your Profile" : (targetResource.full_name || targetResource.name)}]}
+                />
                 <ResourceView
-                    initialMode={"reader"}
+                    initialMode={currentMode}
                     fields={resourceSchema}
                     data={targetResource}
+                    isDirty={isResourceDirty}
                     onUpdate={updateLocalCopy}
                     onCancel={cancelEditing}
                     onSubmit={updateRemoteCopy}

@@ -9,6 +9,7 @@ from starlette.staticfiles import StaticFiles
 
 from midp import static_info
 from midp.common.env_helpers import optional_env
+from midp.common.token_manager import InvalidTokenError
 from midp.log_factory import get_logger_for
 from midp.oauth.handler import oauth_router
 from midp.oauth.models import OpenIDConfiguration
@@ -23,19 +24,27 @@ MINI_IDP_DEV_PERMANENT_DELAY = float(optional_env('MINI_IDP_DEV_PERMANENT_DELAY'
                                                   '0',
                                                   'Permanent connection delay for development and testing'))
 
+API_PREFIX_PATHS = {'/api', '/rest', '/rpc'}
 
 @app.middleware('security')
 async def intercept_request_response(request: Request, call_next):
     log_prefix = f'{request.method} {request.url}'
+    request_path = request.url.path
 
     # Enforce the permanent delay
-    if MINI_IDP_DEV_PERMANENT_DELAY > 0:
+    if (
+            MINI_IDP_DEV_PERMANENT_DELAY > 0
+            and sum([1 if request_path.startswith(p) else 0 for p in API_PREFIX_PATHS]) > 0
+    ):
         log.debug(f'{log_prefix}: Pause the request...')
         await asyncio.sleep(MINI_IDP_DEV_PERMANENT_DELAY)
         log.debug(f'{log_prefix}: Resume the request.')
 
     # Proceed with the request.
-    response: Response = await call_next(request)
+    try:
+        response: Response = await call_next(request)
+    except InvalidTokenError:
+        response = Response(status_code=401)
     response.headers['Server'] = f'{static_info.ARTIFACT_ID}/{static_info.VERSION}'
 
     return response
@@ -64,6 +73,11 @@ async def get_openid_configuration(request: Request) -> OpenIDConfiguration:
     base_url = str(request.base_url)
 
     return OpenIDConfiguration.make(urljoin(base_url, 'oauth/'))
+
+
+@app.post(r'/rpc/inquiry')
+async def run_inquiry(request: Request) -> Response:
+    return Response('Not yet implemented', status_code=501)
 
 
 app.include_router(oauth_router)

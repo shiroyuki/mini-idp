@@ -2,57 +2,14 @@ import styles from "./ResourceView.module.css";
 import React, {CSSProperties, useCallback, useEffect, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
-import Icon from "./Icon";
-import {FormError} from "../common/local-models";
-
-type dataType = "string" | "integer" | "float" | "boolean" | "object";
-
-type ListTransformedOption = {
-    checked: boolean;
-    label?: string;
-    value: string;
-};
-
-type ListRenderingOptions = {
-    list: "selected-only" | "all"; // default: all
-    load: () => Promise<any[]>;
-    maxSelections?: number; // default: -1 (no limit)
-    minSelections?: number; // default: 0 (optional) or 1 (required)
-    compare?: (a: any, b: any) => -1 | 0 | 1;
-    transform: (item: any) => ListTransformedOption;
-};
-
-/**
- * JSON Schema (custom)
- */
-export type Schema = {
-    ///// Standard JSON Schema /////
-    title?: string;
-    type?: dataType;
-    required?: boolean;
-    items?: Schema;
-    ///// Custom properties /////
-    label?: string;
-    readOnly?: boolean;
-    hidden?: boolean;
-    ///// For sensitive information, e.g. password /////
-    requireRepeat?: boolean;
-    sensitive?: boolean;
-    ///// For rendering list /////
-    listRendering?: ListRenderingOptions;
-    ///// For minimal customization /////
-    className?: string;
-    style?: CSSProperties;
-    ///// For custom rendering /////
-    render?: (schema: Schema, data: any) => any;
-};
+import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
 
 type Data = {
     [k: string]: any,
 };
 
 type FieldInputProps = {
-    schema: Schema;
+    schema: ResourceSchema;
     data: any;
     onUpdate?: (key: string, value: any) => any;
 };
@@ -144,7 +101,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                         <ul className={classNames([listingClassNames])}>
                             {
                                 (listState.data as any[])
-                                    .map(item => listRenderingOption.transform(item) as ListTransformedOption)
+                                    .map(item => listRenderingOption.transformForEditing(data, item) as ListTransformedOption)
                                     .filter(item => {
                                         return (listRenderingOption.list === "selected-only" && item.checked)
                                             || (listRenderingOption.list === "all" && (!disabled || item.checked));
@@ -158,7 +115,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                                                     type={"checkbox"}
                                                     disabled={disabled}
                                                     checked={item.checked}
-                                                    onChange={ e => updateList(schema.title as string, item.value, e.target.checked ) }
+                                                    onChange={e => updateList(schema.title as string, item.value, e.target.checked)}
                                                 />
                                                 <span>{itemLabel}</span>
                                             </li>
@@ -208,30 +165,35 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
     }
 }
 
+export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing";
+
 type ResourceProp = {
     data?: Data;
-    fields: Schema[];
-    initialMode?: "reader" | "editor";
+    fields: ResourceSchema[];
+    initialMode?: ResourceViewMode;
+    isDirty?: () => boolean;
     onCancel?: () => void;
-    onSubmit?: () => FormError[] | void;
+    onSubmit?: () => Promise<any> | null;
     onUpdate?: (key: string, value: any) => any;
 }
 
-export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onSubmit}: ResourceProp) => {
-    const [mode, setMode] = React.useState<"reader" | "editor" | undefined>(initialMode || "reader");
+export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCancel, onSubmit}: ResourceProp) => {
+    const [mode, setMode] = React.useState<ResourceViewMode | undefined>(initialMode || "reader");
 
     if (onUpdate && !onCancel) {
         console.warn("The event listener for cancelling the editor mode SHOULD be defined");
     }
 
     const handleFormSubmission = useCallback(
-        () => {
+        async (e: { preventDefault: () => void; }) => {
+            e.preventDefault();
             if (onSubmit) {
-                const errors = onSubmit() || [];
+                setMode("writing");
+                const errors = (await onSubmit()) || [];
                 if (errors.length === 0) {
                     setMode("reader");
-                    console.log("Foo");
                 } else {
+                    setMode("editor");
                     // TODO: Implement the form error feedback.
                 }
             }
@@ -239,54 +201,65 @@ export const ResourceView = ({fields, data, initialMode, onUpdate, onCancel, onS
         [onSubmit, setMode]
     );
 
+    const startEditing = useCallback((e: { preventDefault: () => void; }) => {
+        e.preventDefault();
+        setMode("editor");
+        console.log("Switch to editor");
+    }, [setMode]);
+
     const abortEditing = useCallback(() => {
-        if (confirm("Are you sure you want to discard all changes?")) {
+        const cleanCancellation = isDirty && !isDirty();
+
+        if (cleanCancellation || confirm("Are you sure you want to discard all changes?")) {
             setMode("reader");
             if (onCancel) onCancel();
         }
-    }, [onCancel, setMode]);
+    }, [onCancel, setMode, isDirty]);
+
+    const showActions = (mode === "reader" || mode === "editor") && onUpdate !== undefined;
+    const cancelLabel = (isDirty && isDirty()) ? "Discard changes" : "Stop editing";
+
+    if (mode === "writing") {
+        return <LinearLoadingAnimation label={"Please wait..."}/>;
+    }
 
     return (
         <form className={styles.resourceForm} onSubmit={handleFormSubmission}>
-            {
-                onUpdate && (
-                    <div className={styles.actions}>
-                        {
-                            mode === "reader"
-                                ? (
-                                    <>
-                                        <button type={"button"} onClick={() => setMode("editor")}>Edit</button>
-                                    </>
-                                )
-                                : (
-                                    <>
-                                        <button type={"reset"} onClick={abortEditing} title={"Cancel"}><Icon name={"arrow_back"}/></button>
-                                    </>
-                                )
-                        }
-                    </div>
-                )
-            }
             <div className={styles.controllers}>
-                <div className={styles.controller}>
-                    {
-                        fields.filter(f => !f.hidden)
-                            .map(f => (
+                {
+                    fields.filter(f => !f.hidden)
+                        .map(f => (
+                            <div className={styles.controller}>
                                 <FieldInput
                                     key={f.title}
                                     schema={f}
                                     data={data !== undefined ? data[f.title as string] : undefined}
                                     onUpdate={mode === "editor" ? onUpdate : undefined}
                                 />
-                            ))
-                    }
-                </div>
+                            </div>
+                        ))
+                }
             </div>
-            {mode === "editor" && (
-                <div className={styles.secondaryActions}>
-                    <button type={"submit"}>{data ? "Save" : "Create"}</button>
-                </div>
-            )}
+            {
+                showActions && (
+                    <div className={styles.actions}>
+                        {
+                            mode === "reader"
+                                ? (
+                                    <>
+                                        <button type={"button"} onClick={startEditing}>Edit</button>
+                                    </>
+                                )
+                                : (
+                                    <>
+                                        <button type={"submit"}>{data ? "Save" : "Create"}</button>
+                                        <button type={"reset"} onClick={abortEditing} title={cancelLabel}>{cancelLabel}</button>
+                                    </>
+                                )
+                        }
+                    </div>
+                )
+            }
         </form>
     );
 }

@@ -1,0 +1,50 @@
+.foundationHeader {
+    margin: 0 -24px 24px -24px;
+    padding: 24px;
+    background-color: var(--veryDarkGrey);
+    color: var(--white);
+
+    h1 {}
+}
+
+.navigationItem {
+    display: flex;
+    font-size: 0.75rem;
+    padding: 0;
+    margin-left: 4px;
+
+    &::before {
+        content: "/";
+        color: var(--darkGrey);
+        margin-right: 4px;
+    }
+}
+
+.navigatable {
+    a, a:visited, a:hover {
+        font-weight: 700;
+        color: var(--grey);
+    }
+}
+
+.unnavigatable {
+    span {
+        font-weight: 700;
+        color: var(--grey);
+    }
+}
+
+.navigationBar {
+    display: flex;
+    padding: 0;
+    margin: -8px 0 8px 0;
+    list-style: none;
+
+    > .navigationItem:first-child {
+        margin-left: 0;
+
+        &::before {
+            display: none;
+        }
+    }
+}

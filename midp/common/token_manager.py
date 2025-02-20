@@ -4,6 +4,7 @@ from time import time
 from typing import List, Any, Dict, Optional
 
 from imagination.decorator.service import Service
+from jwt import ExpiredSignatureError
 from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
@@ -15,6 +16,10 @@ from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser
 from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
 
 
+class InvalidTokenError(RuntimeError):
+    pass
+
+
 @Service()
 class TokenParser:
     def __init__(self, enigma: Enigma):
@@ -22,7 +27,11 @@ class TokenParser:
 
     def parse(self, token: str, audience: Optional[str] = None) -> Dict[str, Any]:
         claims: Dict[str, Any] = dict()
-        claims.update(self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
+
+        try:
+            claims.update(self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
+        except ExpiredSignatureError:
+            raise InvalidTokenError()
 
         return claims
 
@@ -34,12 +43,28 @@ class TokenSet(BaseModel):
     refresh_token: Optional[str] = None
 
 
-@Service()
-class GeneralTokenGenerator:
-    def __init__(self, enigma: Enigma):
-        self._enigma = enigma
+class TokenGenerationError(RuntimeError):
+    pass
 
-    def generate(self, access_claims: Dict[str, Any], refresh_claims: Dict[str, Any]) -> TokenSet:
+
+@Service()
+class TokenManager:
+    def __init__(self,
+                 enigma: Enigma,
+                 user_dao: UserDao,
+                 policy_dao: PolicyDao,
+                 client_dao: ClientDao):
+        self._enigma = enigma
+        self._user_dao = user_dao
+        self._policy_dao = policy_dao
+        self._client_dao = client_dao
+
+        self._self_reference_uri = SELF_REFERENCE_URI
+
+        if not self._self_reference_uri.endswith('/'):
+            self._self_reference_uri += '/'
+
+    def _generate_token_set(self, access_claims: Dict[str, Any], refresh_claims: Dict[str, Any]) -> TokenSet:
         current_time = time()
 
         final_access_claims = deepcopy(access_claims)
@@ -55,29 +80,10 @@ class GeneralTokenGenerator:
             refresh_token=self._enigma.encode(final_refresh_claims),
         )
 
-
-class TokenGenerationError(RuntimeError):
-    pass
-
-
-@Service()
-class PrivilegeTokenGenerator:
-    def __init__(self, root_token_manager: GeneralTokenGenerator, user_dao: UserDao, policy_dao: PolicyDao,
-                 client_dao: ClientDao):
-        self._root_token_manager = root_token_manager
-        self._user_dao = user_dao
-        self._policy_dao = policy_dao
-        self._client_dao = client_dao
-
-        self._self_reference_uri = SELF_REFERENCE_URI
-
-        if not self._self_reference_uri.endswith('/'):
-            self._self_reference_uri += '/'
-
-    def generate(self,
-                 subject: IAMPolicySubject,
-                 resource_url: Optional[str] = None,
-                 requested_scopes: Optional[List[str]] = None) -> TokenSet:
+    def create_token_set(self,
+                         subject: IAMPolicySubject,
+                         resource_url: Optional[str] = None,
+                         requested_scopes: Optional[List[str]] = None) -> TokenSet:
         user: Optional[IAMUser] = None
 
         if subject.kind == 'service':
@@ -149,4 +155,20 @@ class PrivilegeTokenGenerator:
                               aud=resource_url,
                               exp=floor(current_time + (ACCESS_TOKEN_TTL * 7)))
 
-        return self._root_token_manager.generate(access_claims, refresh_claims)
+        return self._generate_token_set(access_claims, refresh_claims)
+
+    def parse_token(self, token: str, resource_url: Optional[str] = None):
+        claims: Dict[str, Any] = dict()
+
+        try:
+            claims.update(
+                self._enigma.decode(
+                    token,
+                    issuer=SELF_REFERENCE_URI,
+                    audience=resource_url or SELF_REFERENCE_URI,
+                )
+            )
+        except ExpiredSignatureError:
+            raise InvalidTokenError()
+
+        return claims

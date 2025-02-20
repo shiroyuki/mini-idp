@@ -3,7 +3,7 @@ from typing import Optional
 from imagination.decorator.service import Service
 from pydantic import BaseModel
 
-from midp.common.token_manager import PrivilegeTokenGenerator
+from midp.common.token_manager import TokenManager
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMUserReadOnly, IAMPolicySubject
 
@@ -29,7 +29,7 @@ class AuthenticationError(RuntimeError):
 
 @Service()
 class UserAuthenticator:
-    def __init__(self, user_dao: UserDao, token_manager: PrivilegeTokenGenerator):
+    def __init__(self, user_dao: UserDao, token_manager: TokenManager):
         self._user_dao = user_dao
         self._token_manager = token_manager
 
@@ -38,7 +38,7 @@ class UserAuthenticator:
 
         if user and user.password == password:
             policy_subject = IAMPolicySubject(subject=user.name, kind="user")
-            token_set = self._token_manager.generate(subject=policy_subject, resource_url=resource_url)
+            token_set = self._token_manager.create_token_set(subject=policy_subject, resource_url=resource_url)
 
             return AuthenticationResult(
                 principle=IAMUserReadOnly.build_from(user),

@@ -1,7 +1,8 @@
-import {http} from "./http-client";
+import {http, HttpError} from "./http-client";
 import {IAMRole} from "./models";
 import {CSSProperties} from "react";
 import classNames from "classnames";
+import {ejectToLoginScreen} from "./helpers";
 
 type dataType = "string" | "integer" | "float" | "boolean" | "object";
 
@@ -34,6 +35,17 @@ export type ResourceSchema = {
     label?: string;
     readOnly?: boolean;
     hidden?: boolean;
+    /**
+     * The capability for auto-generation
+     *
+     * - full:pre = fully automated by the UI
+     * - full:post = fully automated by the backend
+     * - semi = automated by the backend if not available.
+     * - UNDEFINED = no automation available
+     */
+    autoGenerationCapability?: "full:pre" | "full:post" | "semi";
+    autoGenerate?: () => any;
+    isPrimaryKey?: boolean;
     isReferenceKey?: boolean;
     ///// For sensitive information, e.g. password /////
     requireRepeat?: boolean;
@@ -52,6 +64,8 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         title: "id",
         label: "ID",
         required: true,
+        isPrimaryKey: true,
+        autoGenerationCapability: "full:post",
         readOnly: true,
         hidden: true,
         style: {
@@ -75,6 +89,13 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         required: true,
     },
     {
+        title: "password",
+        label: "Password",
+        required: true,
+        sensitive: true,
+        hidden: true,
+    },
+    {
         title: "roles",
         label: "Roles",
         required: true,
@@ -84,11 +105,26 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         listRendering: {
             list: "all",
             load: async () => {
-                return await http.simpleSend<IAMRole[]>("get", "/rest/roles/");
+                return await http.sendAndMapAs<IAMRole[]>(
+                    "get",
+                    "/rest/roles/",
+                    {
+                        handleError: response => {
+                            if (response.status === 401) {
+                                ejectToLoginScreen();
+                            } else {
+                                response.text().then(content => {
+                                    throw new HttpError(response.status, content)
+                                });
+                            }
+                        }
+                    }
+                );
             },
             transformForReading: (item: ListTransformedOption) => {
                 return (
-                    <span key={item.value} className={classNames(["foundation-tag", item.checked ? "selected" : "not-selected"])}>{item.label}</span>
+                    <span key={item.value}
+                          className={classNames(["foundation-tag", item.checked ? "selected" : "not-selected"])}>{item.label}</span>
                 );
             },
             transformForEditing: (fieldDataList: any[], loadedListItem: any) => {

@@ -4,7 +4,7 @@ from time import time
 from typing import List, Any, Dict, Optional
 
 from imagination.decorator.service import Service
-from jwt import ExpiredSignatureError
+from jwt import ExpiredSignatureError, DecodeError
 from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
@@ -13,6 +13,7 @@ from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser
+from midp.log_factory import get_logger_for_object
 from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
 
 
@@ -54,6 +55,7 @@ class TokenManager:
                  user_dao: UserDao,
                  policy_dao: PolicyDao,
                  client_dao: ClientDao):
+        self._logger = get_logger_for_object(self)
         self._enigma = enigma
         self._user_dao = user_dao
         self._policy_dao = policy_dao
@@ -168,7 +170,8 @@ class TokenManager:
                     audience=resource_url or SELF_REFERENCE_URI,
                 )
             )
-        except ExpiredSignatureError:
-            raise InvalidTokenError()
+        except (DecodeError, ExpiredSignatureError) as e:
+            self._logger.error(f"Unable to parse this token: {token}")
+            raise InvalidTokenError() from e
 
         return claims

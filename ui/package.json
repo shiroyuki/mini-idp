@@ -24,7 +24,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "build-dev": "vite build --emptyOutDir --watch --sourcemap inline --minify false",
+    "build-dev": "vite build --emptyOutDir --mode dev --watch --sourcemap inline --minify false",
     "build-prod": "vite build --emptyOutDir --minify",
     "start": "react-scripts start",
     "build": "react-scripts build",

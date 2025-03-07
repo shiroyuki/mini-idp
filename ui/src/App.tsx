@@ -1,131 +1,173 @@
-import {Outlet, useNavigate} from 'react-router-dom';
+import {Outlet, useLocation} from 'react-router-dom';
 import './App.scss';
-import {useEffect, useMemo, useState} from "react";
-import {BootingState, AppState, BootingStateMap, convertToResponseInfo, ResponseInfo} from "./common/app-state";
-import {ServiceInfo} from "./common/service-info";
+import {useCallback, useEffect, useState} from "react";
+import {AppState, BootingState, convertToResponseInfo, ResponseInfo} from "./common/app-state";
 import {LinearLoadingAnimation} from "./components/loaders";
-import {SessionInfo} from "./common/session-info";
+
+const FEATURE_PERIODIC_SESSION_CHECK = false;
 
 function parseJsonOrNull(responseInfo?: ResponseInfo | null) {
     return responseInfo ? JSON.parse(responseInfo.body) : null;
 }
 
+const fetchServiceInfo = () => {
+    return fetch("/service-info")
+        .then(async (response) => {
+            return await convertToResponseInfo(response);
+        });
+};
+
+const runSessionValidation = () => {
+    return fetch("/oauth/me/session")
+        .then(
+            async (response) => {
+                return await convertToResponseInfo(response);
+            }
+        );
+}
+
 function App() {
-    const nagivate = useNavigate();
-    const [overallStatus, setOverallStatus] = useState<BootingState>("idle")
-    const [bootingStateMap, setBootingStateMap] = useState<BootingStateMap>({
-        serviceInfo: undefined,
-        sessionInfo: undefined,
+    const [periodicSessionVerificationTaskRef, setPeriodicSessionVerificationTaskRef] = useState<any>(null);
+    const routerLocation = useLocation();
+    const currentlyOnLoginScreen = routerLocation.pathname === "/login";
+    const [currentAppState, setCurrentAppState] = useState<AppState>({
+        status: "idle",
+        inFlightTaskCount: 0,
+        errorTaskCount: 0,
+        completeTaskCount: 0,
+        totalTaskCount: 0,
+        clearSession: () => {
+
+            setCurrentAppState(prevState => {
+                return {
+                    ...prevState,
+                    status: "idle",
+                    inFlightTaskCount: 0,
+                    errorTaskCount: 0,
+                    completeTaskCount: 0,
+                    totalTaskCount: 0,
+                    sessionInfo: undefined,
+                }
+            })
+        }
     });
 
-    const fetchServiceInfo = () => {
-        fetch("/service-info")
-            .then(async (response) => {
-                let responseInfo = await convertToResponseInfo(response);
-                setBootingStateMap(prevState => ({
-                    ...prevState,
-                    serviceInfo: responseInfo,
-                }));
-            });
+    // Note: Not using the callback hook due to recursion.
+    const verifySession = (runningPlan: "on-startup" | "periodic" | "manual") => {
+        runSessionValidation()
+            .then(response => {
+                const responseOk = response.status === 200
+                const updatedContent = parseJsonOrNull(response);
+                let newStatus: BootingState = "init";
+
+                if (responseOk) {
+                    newStatus = "ready";
+                } else if (response.status === 401) {
+                    if (currentAppState.status !== "login-required") {
+                        newStatus = "login-required";
+                    }
+                } else {
+                    newStatus = "error";
+                }
+
+                setCurrentAppState(prevState => {
+                    const newState: AppState = {
+                        ...prevState,
+                        status: newStatus,
+                        sessionInfo: updatedContent,
+                        runSessionValidation: () => verifySession("manual"),
+                    };
+
+                    if (runningPlan === "on-startup") {
+                        newState.inFlightTaskCount = prevState.inFlightTaskCount - 1;
+                        newState.errorTaskCount = prevState.errorTaskCount + (responseOk ? 0 : 1);
+                        newState.completeTaskCount = prevState.completeTaskCount + (responseOk ? 1 : 0);
+                    }
+
+                    return newState;
+                });
+
+                return newStatus;
+            })
+            .then(newStatus => {
+                if (newStatus === "ready") {
+                    if (periodicSessionVerificationTaskRef === null) {
+                        if (FEATURE_PERIODIC_SESSION_CHECK) {
+                            setPeriodicSessionVerificationTaskRef(setInterval(() => verifySession("periodic"), 60000));
+                        } else {
+                            console.warn("Periodic session verification: DRY-RUN: Presumably ACTIVATED");
+                            setPeriodicSessionVerificationTaskRef("faux-periodic-task-id");
+                        }
+                    } else {
+                        // For debugging only
+                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                            console.warn("Periodic session verification: DRY-RUN: Already activated");
+                        }
+                    }
+                } else {
+                    if (periodicSessionVerificationTaskRef === null) {
+                        // For debugging only
+                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                            console.warn("Periodic session verification: DRY-RUN: Already deactivated");
+                        }
+                    } else {
+                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                            console.warn("Periodic session verification: DRY-RUN: Presumably DEACTIVATED");
+                        } else {
+                            clearInterval(periodicSessionVerificationTaskRef);
+                        }
+                        setPeriodicSessionVerificationTaskRef(null);
+                    }
+                }
+            })
+        ;
     };
 
-    const runSessionValidation = () => {
-        fetch("/oauth/me/session")
-            .then(async (response) => {
-                let responseInfo = await convertToResponseInfo(response);
-                setBootingStateMap(prevState => ({
-                    ...prevState,
-                    sessionInfo: responseInfo,
-                }));
+    const getUpdatedServiceInfo = useCallback(() => {
+        fetchServiceInfo()
+            .then(response => {
+                const responseOk = response.status === 200
+                const updatedContent = parseJsonOrNull(response);
+
+                setCurrentAppState(prevState => {
+                    return {
+                        ...prevState,
+                        inFlightTaskCount: prevState.inFlightTaskCount - 1,
+                        errorTaskCount: prevState.errorTaskCount + (responseOk ? 0 : 1),
+                        completeTaskCount: prevState.completeTaskCount + (responseOk ? 1 : 0),
+                        serviceInfo: updatedContent,
+                    }
+                });
             });
-    }
+    }, []);
 
     useEffect(() => {
-        if (overallStatus === "idle") {
-            setOverallStatus("init");
+        if (currentAppState.status === "idle") {
+            setCurrentAppState(prevState => {
+                return {
+                    ...prevState,
+                    status: "init",
+                    inFlightTaskCount: 2,
+                    totalTaskCount: 2,
+                }
+            });
 
-            fetchServiceInfo();
-            runSessionValidation();
+            getUpdatedServiceInfo();
 
-            // setInterval(() => runSessionValidation(), 60000);
+            verifySession("on-startup");
         }
     });
 
-    const appState: AppState = useMemo<AppState>(() => {
-        const appState: AppState = {
-            status: "init",
-            inFlightTaskCount: 0,
-            errorTaskCount: 0,
-            completeTaskCount: 0,
-            totalTaskCount: 0,
-            serviceInfo: parseJsonOrNull(bootingStateMap.serviceInfo) satisfies ServiceInfo,
-            sessionInfo: parseJsonOrNull(bootingStateMap.sessionInfo) satisfies SessionInfo,
-            runSessionValidation: () => {
-                if (bootingStateMap.sessionInfo) {
-                    console.log("Run the session validation where the session info is AVAILABLE.");
-                    setBootingStateMap(ps => ({
-                        ...ps,
-                        sessionInfo: undefined,
-                    }));
-                } else {
-                    console.log("Run the session validation where the session info is NOT available.");
-                    // NOOP
-                }
-                runSessionValidation();
-            },
-        };
-
-        const knownStates = Object.keys(bootingStateMap)
-            .map(key => {
-                let response: ResponseInfo = bootingStateMap[key] as ResponseInfo;
-
-                appState.totalTaskCount++;
-
-                if (response === undefined) {
-                    appState.inFlightTaskCount++;
-                    return "idle";
-                } else if (response === null) {
-                    appState.inFlightTaskCount++;
-                    return "init";
-                } else if (response.status === 401) {
-                    appState.completeTaskCount++;
-                    return "authentication-required";
-                } else if (response.status === 200) {
-                    appState.completeTaskCount++;
-                    return "ready";
-                } else {
-                    appState.errorTaskCount++;
-                    return "error";
-                }
-            });
-
-        if (knownStates.includes("error")) {
-            appState.status = "error";
-        } else if (knownStates.includes("authentication-required")) {
-            appState.status = "authentication-required";
-        } else if (knownStates.includes("init")) {
-            appState.status = "init";
-        } else if (knownStates.includes("idle")) {
-            appState.status = "idle";
-        } else {
-            appState.status = "ready";
-        }
-
-        setOverallStatus(appState.status);
-
-        return appState;
-    }, [bootingStateMap, bootingStateMap.sessionInfo]);
-
-    const progress = 100.0 * (appState.completeTaskCount + appState.errorTaskCount) / appState.totalTaskCount;
+    const progress = 100.0 * (currentAppState.completeTaskCount + currentAppState.errorTaskCount) / currentAppState.totalTaskCount;
 
     if (progress === 100) {
-        if (appState.status === "error") {
+        if (currentAppState.status === "error") {
             return <>
                 <h1>Unable to initialize the UI at the moment.</h1>
                 <p>Please check the web console.</p>
             </>
         } else {
-            return <Outlet context={appState}/>;
+            return <Outlet context={currentAppState}/>;
         }
     } else {
         return <div style={{

@@ -11,6 +11,15 @@ import {IAM_USER_SCHEMA} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
 import {MyProfilePage} from "./pages/SettingsPage";
 
+const userManagerPage = (
+    <ResourceManagerPage
+        baseBackendUri={"/rest/users"}
+        baseFrontendUri={"/users"}
+        schema={IAM_USER_SCHEMA}
+        listPage={{title: "Users"}}
+    />
+);
+
 const router = createHashRouter([
     {
         path: '/',
@@ -31,25 +40,11 @@ const router = createHashRouter([
             {
                 path: 'users',
                 // @ts-ignore
-                element: (
-                    <ResourceManagerPage
-                        baseBackendUri={"/rest/users"}
-                        baseFrontendUri={"/users"}
-                        schema={IAM_USER_SCHEMA}
-                        listPage={{title: "Users"}}
-                    />
-                ),
+                element: userManagerPage,
                 children: [
                     {
                         path: ":id",
-                        element: (
-                            <ResourceManagerPage
-                                baseBackendUri={"/rest/users"}
-                                baseFrontendUri={"/users"}
-                                schema={IAM_USER_SCHEMA}
-                                listPage={{title: "Users"}}
-                            />
-                        )
+                        element: userManagerPage
                     }
                 ]
             },

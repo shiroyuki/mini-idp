@@ -1,6 +1,11 @@
-from imagination.decorator.service import Service
+from typing import Annotated, Dict, Any
 
-from midp.common.base_rest_controller import BaseRestController
+from fastapi import Depends
+from imagination.decorator.service import Service
+from starlette.requests import Request
+
+from midp.common.base_rest_controller import BaseRestController, TypeParameter
+from midp.common.web_helpers import authenticate_with_bearer_token
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
@@ -40,3 +45,6 @@ class UserRestController(BaseRestController[IAMUser]):
 
     def _hide_sensitive_fields(self, obj: IAMUser) -> IAMUser:
         return obj.model_copy(update={"password": None}, deep=False)
+
+    def create(self, request: Request, obj: IAMUser, access_token: Annotated[Dict[str, Any], Depends(authenticate_with_bearer_token)]) -> IAMUser:
+        return super().create(request, obj, access_token)

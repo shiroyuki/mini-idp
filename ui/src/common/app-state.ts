@@ -1,7 +1,16 @@
 import {ServiceInfo} from "./service-info";
 import {SessionInfo} from "./session-info";
 
-export type BootingState = "idle" | "init" | "ready" | "error" | "authentication-required";
+/**
+ * Booting state
+ *
+ * - idle = the default state
+ * - init = the initialization in progress
+ * - ready = the UI is ready
+ * - error = the error state
+ * - login-required = the login-required state
+ */
+export type BootingState = "idle" | "init" | "ready" | "error" | "login-required";
 
 export interface ResponseInfo {
     status: number;
@@ -17,10 +26,6 @@ export const convertToResponseInfo = async (response: Response) => {
     } satisfies ResponseInfo;
 };
 
-export interface BootingStateMap {
-    [k: string]: ResponseInfo | null | undefined;
-}
-
 export interface AppState {
     status: BootingState;
     // Stat Info
@@ -29,8 +34,9 @@ export interface AppState {
     completeTaskCount: number;
     totalTaskCount: number;
     // Parsed Info
-    serviceInfo: ServiceInfo;
-    sessionInfo: SessionInfo;
+    serviceInfo?: ServiceInfo | null;
+    sessionInfo?: SessionInfo | null;
     // Callbacks
     runSessionValidation?: () => void;
+    clearSession: () => void;
 }

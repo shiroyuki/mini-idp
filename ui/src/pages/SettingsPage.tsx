@@ -18,7 +18,7 @@ export const MyProfilePage = () => {
                 navigation={waypoints}
             />
             <SoloResource
-                id={appState.sessionInfo.id}
+                id={appState.sessionInfo?.id}
                 baseBackendUri={"/rest/users"}
                 schema={IAM_USER_SCHEMA}
             />

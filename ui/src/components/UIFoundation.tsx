@@ -5,6 +5,7 @@ import {Link, useLocation, useNavigate, useNavigation, useOutletContext} from "r
 import classNames from "classnames";
 import { http } from "../common/http-client";
 import {LinearLoadingAnimation} from "./loaders";
+import {AppState} from "../common/app-state";
 
 type NavigationItem = {
     label: string;
@@ -38,10 +39,10 @@ const NavigationItem = (nav: NavigationItem) => {
 
 export default ({children}: { children: ReactNode }) => {
     const navigate = useNavigate();
+    const appState = useOutletContext<AppState>();
     const [interruptionMessage, setInterruptionMessage] = useState<string|null>(null);
     const signOut = useCallback(
         () => {
-            console.log("A");
             setInterruptionMessage("Signing out...");
 
             http.send("get", "/oauth/logout")
@@ -49,10 +50,11 @@ export default ({children}: { children: ReactNode }) => {
                     sessionStorage.removeItem("access_token");
                     sessionStorage.removeItem("refresh_token");
                     setInterruptionMessage(null);
+                    appState.clearSession();
                     navigate("/login");
                 })
         },
-        [navigate]
+        [appState, navigate]
     );
 
     if (interruptionMessage !== null) {

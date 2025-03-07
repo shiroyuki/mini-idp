@@ -77,11 +77,15 @@ input[type="text"], input[type="password"] {
   }
 }
 
-button {
+button, a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 8px 12px;
   font-size: 1rem;
   border: none;
+  text-decoration: none;
 
   color: #000;
   background-color: var(--veryLightGrey);
@@ -92,7 +96,22 @@ button {
     background-color: var(--lightGrey);
   }
 
-  &[disabled] {
+  & > .icon:first-child {
+    margin-left: -4px;
+    margin-right: 8px;
+  }
+
+  & > .icon:last-child {
+    margin-left: 8px;
+    margin-right: -4px;
+  }
+
+  & > .icon:first-child:last-child {
+    margin-left: -4px;
+    margin-right: -4px;
+  }
+
+  &[disabled],.disabled {
     color: var(--grey);
   }
 
@@ -146,8 +165,12 @@ form {
     flex-direction: column;
   }
 
+  & > .field {
+    margin-top: 8px;
+  }
+
   & > .field label {
-    margin-bottom: 0.5rem;
+    margin-bottom: 8px;
   }
 
   & > .actions {
@@ -208,4 +231,37 @@ form {
   padding: 4px 8px;
   border-radius: 4px;
   background-color: var(--lightGrey);
+}
+
+.data-table-container {
+  .data-table-navigator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+
+    .data-table-navigator-primary {
+      display: flex;
+      flex-direction: row;
+
+      & > * {
+        margin-right: 2px;
+      }
+    }
+
+    .data-table-navigator-secondary {
+      display: flex;
+      flex-direction: row;
+
+      & > * {
+        margin-left: 2px;
+      }
+    }
+  }
+
+  .data-table {
+    .data-table-row-selector {
+      border-right: 1px dashed var(--grey);
+      text-align: right;
+    }
+  }
 }

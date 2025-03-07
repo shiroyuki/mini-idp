@@ -31,7 +31,7 @@ def optional_env(env: str, default: Any = None, help: Optional[str] = None) -> s
 
     return set_value
 
-
+IN_DEBUG_MODE = optional_env('MINI_IDP_DEBUG', '', help="The debug mode flag").lower() in ['1', 'true']
 SELF_REFERENCE_URI = optional_env('MINI_IDP_SELF_REF_URI',
                                   'http://localhost:8081/',
                                   help="Self reference URI back to this service")

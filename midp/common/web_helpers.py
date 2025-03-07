@@ -7,10 +7,12 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import Response
 
-from midp.common.env_helpers import SELF_REFERENCE_URI
 from midp.common.renderer import TemplateRenderer
 from midp.common.session_manager import SessionManager, Session
-from midp.common.token_manager import TokenParser, TokenManager
+from midp.common.token_manager import TokenManager, InvalidTokenError
+from midp.log_factory import get_logger_for
+
+mod_logger = get_logger_for("midp.common.web_helpers")
 
 
 class GenericResponse(BaseModel):
@@ -68,6 +70,10 @@ async def restore_session(request: Request) -> Session:
     return session
 
 
+class MissingBearerToken(Exception):
+    pass
+
+
 class InvalidBearerToken(Exception):
     pass
 
@@ -75,14 +81,25 @@ class InvalidBearerToken(Exception):
 def retrieve_bearer_token(request: Request) -> str:
     raw_bearer_token = request.headers.get('Authorization')
     if raw_bearer_token and raw_bearer_token.startswith('Bearer '):
-        return raw_bearer_token[len('Bearer '):]
+        token = raw_bearer_token[len('Bearer '):]
+        if token and len(token) >= 20:
+            return token
+        else:
+            raise MissingBearerToken()
     else:
-        raise InvalidBearerToken()
+        raise MissingBearerToken()
 
 
 def authenticate_with_bearer_token(request: Request) -> Dict[str, Any]:
     manager: TokenManager = container.get(TokenManager)
-    return manager.parse_token(retrieve_bearer_token(request))
+    try:
+        return manager.parse_token(retrieve_bearer_token(request))
+    except MissingBearerToken as e:
+        raise e
+    except InvalidTokenError as e:
+        raise InvalidBearerToken("missing" if isinstance(e, MissingBearerToken) else "invalid") from e
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error: {type(e).__module__}.{type(e).__name__}: {e}") from e
 
 
 # def current_user(request: Request) -> Optional[Dict[str, Any]]:

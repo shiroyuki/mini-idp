@@ -1,12 +1,10 @@
 import styles from "./ResourceView.module.css";
-import React, {CSSProperties, useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
 import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
-
-type Data = {
-    [k: string]: any,
-};
+import {GenericModel} from "../common/models";
+import Icon from "./Icon";
 
 type FieldInputProps = {
     schema: ResourceSchema;
@@ -20,6 +18,9 @@ type ListState = {
 }
 
 const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
+    const isSensitiveField = schema.sensitive;
+    const [showSecret, setShowSecret] = useState<boolean>(!isSensitiveField);
+
     if (schema.items) {
         if (!schema.listRendering) {
             throw new Error(`Field ${schema.title}: listRendering UNDEFINED`);
@@ -63,11 +64,14 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 return; // NOOP
             }
 
+            let updatedData = [...(data || [])];
+
             if (checked) {
-                data.push(value);
-                onUpdate(schema.title as string, data);
+                updatedData.push(value);
+                console.log("PANDA: CHECKED", value)
+                onUpdate(schema.title as string, updatedData);
             } else {
-                const updatedData = (data as any[])
+                updatedData = updatedData
                     .filter(item => {
                         if (schema.listRendering?.compare) {
                             return schema.listRendering?.compare(item, value) !== 0;
@@ -80,6 +84,12 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
         },
         [onUpdate, data, schema.title, schema.listRendering]
     );
+
+    const handleUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (onUpdate) {
+            onUpdate(schema.title as string, e.target.value);
+        }
+    }
 
     if (isRenderingList) {
         if (listState === undefined) {
@@ -145,6 +155,29 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 {fieldLabel}
             </>
         );
+    } else if (schema.sensitive) {
+        return (
+            <>
+                {fieldLabel}
+                <div className={classNames([styles.sensitiveInput, showSecret ? styles.secretRevealed : styles.secretHidden])}>
+                    <input
+                        id={schema.title}
+                        {...props}
+                        type={showSecret ? "text" : "password"}
+                        value={data}
+                        onChange={handleUpdate}
+                        autoComplete="off"
+                    />
+                    <button onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowSecret(prevState => !prevState)
+                    }}>
+                        <Icon name={showSecret ? "visibility_off" : "visibility"}/>
+                    </button>
+                </div>
+            </>
+        );
     } else {
         return (
             <>
@@ -152,23 +185,19 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 <input
                     id={schema.title}
                     {...props}
-                    type="text"
+                    type={"text"}
                     value={data}
-                    onChange={(e) => {
-                        if (onUpdate) {
-                            onUpdate(schema.title as string, e.target.value);
-                        }
-                    }}
+                    onChange={handleUpdate}
                 />
             </>
         );
     }
 }
 
-export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing";
+export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing" | "creator";
 
 type ResourceProp = {
-    data?: Data;
+    data?: GenericModel;
     fields: ResourceSchema[];
     initialMode?: ResourceViewMode;
     isDirty?: () => boolean;
@@ -185,8 +214,9 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
     }
 
     const handleFormSubmission = useCallback(
-        async (e: { preventDefault: () => void; }) => {
+        async (e) => {
             e.preventDefault();
+            e.stopPropagation();
             if (onSubmit) {
                 setMode("writing");
                 const errors = (await onSubmit()) || [];
@@ -201,22 +231,30 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
         [onSubmit, setMode]
     );
 
-    const startEditing = useCallback((e: { preventDefault: () => void; }) => {
+    const startEditing = useCallback((e) => {
         e.preventDefault();
+        e.stopPropagation();
         setMode("editor");
-        console.log("Switch to editor");
     }, [setMode]);
 
     const abortEditing = useCallback(() => {
         const cleanCancellation = isDirty && !isDirty();
 
-        if (cleanCancellation || confirm("Are you sure you want to discard all changes?")) {
-            setMode("reader");
-            if (onCancel) onCancel();
+        if (mode === "creator") {
+            if (confirm("Are you sure you want to discard all changes?")) {
+                if (onCancel) onCancel();
+                else alert("The cancellation of creation is not implemented.");
+            }
+        } else {
+            if (cleanCancellation || confirm("Are you sure you want to discard all changes?")) {
+                setMode("reader");
+                if (onCancel) onCancel();
+            }
         }
-    }, [onCancel, setMode, isDirty]);
+    }, [onCancel, setMode, isDirty, mode]);
 
-    const showActions = (mode === "reader" || mode === "editor") && onUpdate !== undefined;
+    const inWritingMode = mode === "editor" || mode === "creator";
+    const showActions = (mode === "reader" || inWritingMode) && onUpdate !== undefined;
     const cancelLabel = (isDirty && isDirty()) ? "Discard changes" : "Stop editing";
 
     if (mode === "writing") {
@@ -224,17 +262,28 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
     }
 
     return (
-        <form className={styles.resourceForm} onSubmit={handleFormSubmission}>
+        <form className={styles.resourceForm} onSubmit={handleFormSubmission} autoComplete="off">
             <div className={styles.controllers}>
                 {
-                    fields.filter(f => !f.hidden)
+                    fields
+                        .filter(f => {
+                            if (f.autoGenerationCapability === "full:post" || f.autoGenerationCapability === "full:pre") {
+                                return false; // the fully generated field will not be editable.
+                            } else if (mode === "creator") {
+                                return true; // show all fields
+                            } else if (f.hidden) {
+                                return false;
+                            } else {
+                                return true;
+                            }
+                        })
                         .map(f => (
                             <div className={styles.controller}>
                                 <FieldInput
                                     key={f.title}
                                     schema={f}
-                                    data={data !== undefined ? data[f.title as string] : undefined}
-                                    onUpdate={mode === "editor" ? onUpdate : undefined}
+                                    data={(data !== undefined && data !== null) ? data[f.title as string] : undefined}
+                                    onUpdate={inWritingMode ? onUpdate : undefined}
                                 />
                             </div>
                         ))
@@ -252,8 +301,9 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
                                 )
                                 : (
                                     <>
-                                        <button type={"submit"}>{data ? "Save" : "Create"}</button>
-                                        <button type={"reset"} onClick={abortEditing} title={cancelLabel}>{cancelLabel}</button>
+                                        <button type={"submit"}>{mode === "editor" ? "Save" : "Create"}</button>
+                                        {data && <button type={"reset"} onClick={abortEditing}
+                                                         title={cancelLabel}>{cancelLabel}</button>}
                                     </>
                                 )
                         }

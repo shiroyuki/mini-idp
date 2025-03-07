@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from urllib.parse import urljoin
 
 from fastapi import FastAPI
@@ -8,14 +9,14 @@ from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 from midp import static_info
-from midp.common.env_helpers import optional_env
-from midp.common.token_manager import InvalidTokenError
+from midp.common.env_helpers import optional_env, IN_DEBUG_MODE
+from midp.common.web_helpers import InvalidBearerToken, MissingBearerToken
+from midp.iam.handlers import iam_rest_routers
+from midp.iam.rpc_handlers import iam_rpc_router
 from midp.log_factory import get_logger_for
 from midp.oauth.handler import oauth_router
 from midp.oauth.models import OpenIDConfiguration
 from midp.snapshot.handler import recovery_router
-from midp.iam.handlers import iam_rest_routers
-from midp.iam.rpc_handlers import iam_rpc_router
 
 app = FastAPI(title=static_info.ARTIFACT_ID, version=static_info.VERSION)
 log = get_logger_for('root:web')
@@ -43,8 +44,12 @@ async def intercept_request_response(request: Request, call_next):
     # Proceed with the request.
     try:
         response: Response = await call_next(request)
-    except InvalidTokenError:
-        response = Response(status_code=401)
+    except (MissingBearerToken, InvalidBearerToken):
+        content = ''
+        if IN_DEBUG_MODE:
+            data = traceback.format_exc()
+            log.warning(f'PANDA: On Security: Exception: {data}')
+        response = Response(status_code=401, content=content)
     response.headers['Server'] = f'{static_info.ARTIFACT_ID}/{static_info.VERSION}'
 
     return response

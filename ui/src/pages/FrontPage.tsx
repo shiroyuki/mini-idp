@@ -6,7 +6,7 @@ export const FrontPage = () => {
     const appState: AppState = useOutletContext<AppState>();
     const navigate = useNavigate();
 
-    if (appState.status === "authentication-required") {
+    if (appState.status === "login-required") {
         return navigate("/login");
     } else {
         return navigate("/users");

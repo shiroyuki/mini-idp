@@ -1,0 +1,25 @@
+.vCheckbox {
+    display: inline-flex;
+    cursor: pointer;
+    max-width: 46px;
+    max-height: 46px;
+    text-decoration: none;
+    color: var(--black);
+}
+
+.vCheckbox:focus {
+}
+
+.vCheckboxInFlight {
+    opacity: 0.8;
+}
+
+.vSwitch {
+    display: inline-flex;
+    border: 1px solid var(--lightGrey);
+    background-color: var(--veryLightGrey);
+}
+
+.vSwitchActive {
+    background-color: var(--white);
+}

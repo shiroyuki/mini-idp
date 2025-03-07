@@ -14,7 +14,7 @@ export const UserProfile = ({id, mode}: { id?: string, mode?: ResourceViewMode }
     const resourceSchema = IAM_USER_SCHEMA;
 
     const loadResource = useCallback(() => {
-        http.simpleSend<IAMUserReadOnly>("get", targetResourceId === null ? '/rpc/iam/self/profile' : `/rest/users/${targetResourceId}`)
+        http.sendAndMapAs<IAMUserReadOnly>("get", targetResourceId === null ? '/rpc/iam/self/profile' : `/rest/users/${targetResourceId}`)
             .then(
                 (data) => {
                     setTargetResource(data);
@@ -47,7 +47,7 @@ export const UserProfile = ({id, mode}: { id?: string, mode?: ResourceViewMode }
         setCurrentMode("writing")
 
         try {
-            const data = await http.simpleSend<IAMUserReadOnly>("put", `/rest/users/${targetResource.id}`, {json: patch});
+            const data = await http.sendAndMapAs<IAMUserReadOnly>("put", `/rest/users/${targetResource.id}`, {json: patch});
             setTargetResource(data);
             setDirty(false);
             setCurrentMode("reader");

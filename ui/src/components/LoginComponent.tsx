@@ -95,19 +95,20 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
 
             if (result.error === null) {
                 if (result.access_token !== null && result.access_token !== "") {
-                    sessionStorage.setItem("access_token", result.access_token);
+                    sessionStorage.setItem("access_token", JSON.stringify(result.access_token));
                 } else {
                     sessionStorage.removeItem("access_token");
                 }
 
                 if (result.refresh_token !== null && result.refresh_token !== "") {
-                    sessionStorage.setItem("refresh_token", result.refresh_token);
+                    sessionStorage.setItem("refresh_token", JSON.stringify(result.refresh_token));
                 } else {
                     sessionStorage.removeItem("refresh_token");
                 }
             }
 
             appState.runSessionValidation && appState.runSessionValidation();
+
             navigate("/");
         } else {
             if (response.status < 500) {

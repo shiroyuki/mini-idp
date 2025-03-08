@@ -10,13 +10,26 @@ import {ResourceManagerPage} from "./pages/ResourceManagerPage";
 import {IAM_USER_SCHEMA} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
 import {MyProfilePage} from "./pages/SettingsPage";
+import {GenericModel, IAMUser} from "./common/models";
+import {storage} from "./common/storage";
 
 const userManagerPage = (
     <ResourceManagerPage
         baseBackendUri={"/rest/users"}
         baseFrontendUri={"/users"}
         schema={IAM_USER_SCHEMA}
-        listPage={{title: "Users"}}
+        listPage={
+            {
+                title: "Users",
+                assertResourceIsReadOnly: (item: GenericModel) => {
+                    const user = item as IAMUser;
+                    const accessToken = storage.get("access_token");
+                    const encodedClaims = accessToken.split(".")[1];
+                    const claims = JSON.parse(atob(encodedClaims)) as {sub: string};
+                    return claims.sub === item.id;
+                }
+            }
+        }
     />
 );
 
@@ -28,7 +41,8 @@ const router = createHashRouter([
             <UIFoundation>
                 <h1 style={{textTransform: "uppercase", fontSize: "2rem", paddingTop: "24px"}}>Not available</h1>
                 <p style={{margin: "1rem 0"}}>
-                    If you think this is our mistake, please file an issue on <a href="https://github.com/shiroyuki/mini-idp/issues">GitHub</a>.
+                    If you think this is our mistake, please file an issue on <a
+                    href="https://github.com/shiroyuki/mini-idp/issues">GitHub</a>.
                 </p>
             </UIFoundation>
         ),

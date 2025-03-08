@@ -6,6 +6,7 @@ import {AppState} from "../common/app-state";
 import {LinearLoadingAnimation} from "./loaders";
 import LargeAppLogo from "./LargeAppLogo";
 import classNames from "classnames";
+import {storage} from "../common/storage";
 
 interface LoginComponentProps {
 }
@@ -95,15 +96,15 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
 
             if (result.error === null) {
                 if (result.access_token !== null && result.access_token !== "") {
-                    sessionStorage.setItem("access_token", JSON.stringify(result.access_token));
+                    storage.set("access_token", result.access_token);
                 } else {
-                    sessionStorage.removeItem("access_token");
+                    storage.remove("access_token");
                 }
 
                 if (result.refresh_token !== null && result.refresh_token !== "") {
-                    sessionStorage.setItem("refresh_token", JSON.stringify(result.refresh_token));
+                    storage.set("refresh_token", result.refresh_token);
                 } else {
-                    sessionStorage.removeItem("refresh_token");
+                    storage.remove("refresh_token");
                 }
             }
 

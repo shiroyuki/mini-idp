@@ -1,3 +1,5 @@
+import {storage} from "./storage";
+
 export type ClientOptions = {
     authRequired?: boolean;
     noAuth?: boolean;
@@ -38,8 +40,7 @@ export class HttpClient {
         };
 
         if (!noAuth) {
-            const rawAccessToken = sessionStorage.getItem("access_token");
-            const accessToken = rawAccessToken === null ? null : JSON.parse(rawAccessToken);
+            const accessToken = storage.get("access_token");
             if (accessToken !== null) {
                 headers['Authorization'] = `Bearer ${accessToken}`;
             } else {

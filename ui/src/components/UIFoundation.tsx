@@ -6,6 +6,7 @@ import classNames from "classnames";
 import { http } from "../common/http-client";
 import {LinearLoadingAnimation} from "./loaders";
 import {AppState} from "../common/app-state";
+import {storage} from "../common/storage";
 
 type NavigationItem = {
     label: string;
@@ -47,8 +48,8 @@ export default ({children}: { children: ReactNode }) => {
 
             http.send("get", "/oauth/logout")
                 .then(() => {
-                    sessionStorage.removeItem("access_token");
-                    sessionStorage.removeItem("refresh_token");
+                    storage.remove("access_token");
+                    storage.remove("refresh_token");
                     setInterruptionMessage(null);
                     appState.clearSession();
                     navigate("/login");

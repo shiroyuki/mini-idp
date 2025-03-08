@@ -7,16 +7,14 @@ import {LinearLoadingAnimation} from "../components/loaders";
 import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {ResourceView, ResourceViewMode} from "../components/ResourceView";
-import {GenericModel, IAMUserReadOnly} from "../common/models";
+import {GenericModel} from "../common/models";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 
-export type ItemMatcher = (given: any, seaker: any) => boolean;
-
 type ListPageProps = {
     title: string;
-    matchItem?: ItemMatcher;
+    assertResourceIsReadOnly?: (item: GenericModel) => boolean;
 }
 
 type MainProps = {
@@ -86,6 +84,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
                 baseBackendUri={baseBackendUri}
                 baseFrontendUri={baseFrontendUri}
                 schema={schema}
+                assertResourceIsReadOnly={listPage.assertResourceIsReadOnly}
             />
         );
     }
@@ -246,22 +245,37 @@ type ListProps = {
     baseBackendUri: string;
     baseFrontendUri: string;
     schema: ResourceSchema[];
+    assertResourceIsReadOnly?: (item: GenericModel) => boolean;
 }
 
-const makeSelectionKey = (primaryKeyList: string[], data: GenericModel) => {
-    const keyList = primaryKeyList.map(k => `${k}=${JSON.stringify(data[k])}`);
-    return keyList.join(";");
-}
-
-const ResourceList = ({baseBackendUri, baseFrontendUri, schema}: ListProps) => {
+const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIsReadOnly}: ListProps) => {
     const [inFlight, setInFlight] = useState<number>(0);
+    const [deleterMode, setDeleterMode] = useState<"off" | "prompt" | "in-progress" | "complete">("off");
     const [cacheMap, setCacheMap] = useState<{ [key: string]: any } | undefined>(undefined);
-    const [resourceList, setResourceList] = useState<any[] | undefined>(undefined);
-    const [selectionKeyList, setSelectionKeyList] = useState<string[]>([]);
-    const [selectionList, setSelectionList] = useState<any[]>([]);
+    const [resourceList, setResourceList] = useState<GenericModel[] | undefined>(undefined);
+    const [selectionList, setSelectionList] = useState<GenericModel[]>([]);
     const primaryKeyList = schema
         .filter(field => field.isPrimaryKey)
         .map(field => field.title as string)
+    const selectionCollection = useMemo(
+        () => new ListCollection(
+            selectionList,
+            (given, seeker) => {
+                for (const pkFieldName of primaryKeyList) {
+                    if (given[pkFieldName] < seeker[pkFieldName]) {
+                        return -1;
+                    } else if (given[pkFieldName] > seeker[pkFieldName]) {
+                        return 1;
+                    }
+
+                    // NOTE: When it is equal, check the next field.
+                }
+
+                return 0;
+            }
+        ),
+        [selectionList, primaryKeyList]
+    );
 
     useEffect(() => {
         for (const rawField of schema) {
@@ -284,6 +298,7 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema}: ListProps) => {
         }
 
         setInFlight(prevState => prevState + 1);
+
         http.sendAndMapAs<any[]>(
             "get",
             `${baseBackendUri}/`,
@@ -295,21 +310,37 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema}: ListProps) => {
             });
     }, []);
 
-    const toggleSelection = (targetKey: string, checked: boolean) => {
-        // const collection = new ListCollection(selectionList);
-        // if (collection)
+    const toggleSelection = useCallback(
+        (target: GenericModel, checked: boolean) => {
+            if (selectionCollection.contains(target)) {
+                setSelectionList(selectionCollection.remove(target).toArray());
+            } else {
+                setSelectionList(selectionCollection.add(target).toArray());
+            }
+        },
+        [selectionCollection]
+    )
 
-        if (selectionKeyList.includes(targetKey)) {
-            setSelectionKeyList(previousSelectionKeyList => previousSelectionKeyList.filter(selectedKey => {
-                return selectedKey !== targetKey;
-            }));
-        } else {
-            setSelectionKeyList(previousSelectionKeyList => [...previousSelectionKeyList, targetKey]);
-        }
-    }
+    const toggleAllSelections = useCallback(
+        (value: any, checked: boolean) => {
+            console.log("PANDA: value =", value, "; checked =", checked);
+            if (checked) {
+                setSelectionList([
+                    ...(resourceList || [])
+                        .filter(item => assertResourceIsReadOnly && !assertResourceIsReadOnly(item))
+                ]);
+            } else {
+                setSelectionList([]);
+            }
+        },
+        [setSelectionList, resourceList]
+    )
 
-    const deleteResources = () => {
-        ///
+    // @ts-ignore
+    const askUserForDeleteConfirmation = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDeleterMode("prompt");
     }
 
     if (resourceList === undefined || cacheMap === undefined || inFlight > 0) {
@@ -318,21 +349,79 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema}: ListProps) => {
 
     return (
         <div className="data-table-container">
-            <div className="data-table-navigator">
-                <div className="data-table-navigator-primary">
-                    <a href={`#${baseFrontendUri}/new`} className={"btn"}><Icon name={"add"}/> Add</a>
-                    {
-                        selectionKeyList.length > 0 && (
-                            <button className={"destructive"}><Icon name={"delete"}/> Remove</button>
-                        )
-                    }
-                </div>
-                <div className="data-table-navigator-secondary"></div>
-            </div>
+            {
+                deleterMode !== "off" && (
+                    <div className="data-table-deleter">
+                        <span className="data-table-delete-confirmation-prompt">
+                            <Icon name={"warning"}/>
+                            Continue to delete the selection{selectionCollection.size() && "s"}?
+                        </span>
+                        <span className={"spacer"}></span>
+                        <button className={"data-table-delete-confirm destructive"}>Proceed</button>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDeleterMode("off");
+                            }}
+                        >
+                            Not now
+                        </button>
+                    </div>
+                )
+            }
+
+            {
+                deleterMode === "off" && (
+                    <div className="data-table-navigator">
+                        <div className="data-table-navigator-primary">
+                            <a href={`#${baseFrontendUri}/new`} className={"btn"}>
+                                <Icon name={"add"}/>
+                                <span>Add</span>
+                            </a>
+                            {
+                                !selectionCollection.isEmpty() && deleterMode === "off" && (
+                                    <button
+                                        className={"data-table-delete-initiator destructive"}
+                                        onClick={askUserForDeleteConfirmation}
+                                    >
+                                        <Icon name={"delete"}/>
+                                        <span>Remove</span>
+                                        <span className={"data-table-delete-counter"}>
+                                    {selectionCollection.size()}
+                                </span>
+                                    </button>
+                                )
+                            }
+                        </div>
+                        <div className="data-table-navigator-secondary"></div>
+                    </div>
+                )
+            }
+
             <table className={classNames(["data-table"])}>
                 <thead>
                 <tr>
-                    <th className={"data-table-row-selector"}></th>
+                    <th className={"data-table-row-selector"}>
+                        <VCheckbox
+                            checked={
+                                selectionCollection.isEmpty()
+                                    ? false
+                                    : (
+                                        (
+                                            selectionCollection.size()
+                                            === resourceList
+                                                .filter(resource => assertResourceIsReadOnly && !assertResourceIsReadOnly(resource))
+                                                .length
+                                        )
+                                            ? true
+                                            : "indeterminate"
+                                    )
+                            }
+                            onClick={toggleAllSelections}
+                            onKeyUp={toggleAllSelections}
+                        />
+                    </th>
                     {
                         schema.filter(field => !field.hidden)
                             .map(field => (
@@ -343,17 +432,24 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema}: ListProps) => {
                 </thead>
                 <tbody>
                 {
-                    resourceList.map(resource => {
-                            const selectionKey = makeSelectionKey(primaryKeyList, resource)
+                    resourceList.map(
+                        resource => {
+                            const selectable = assertResourceIsReadOnly && !assertResourceIsReadOnly(resource);
                             return (
                                 <tr key={schema[0].title}>
-                                    <td className={"data-table-row-selector"}>
-                                        <VCheckbox
-                                            checked={selectionKeyList.includes(selectionKey)}
-                                            value={selectionKey}
-                                            onClick={toggleSelection}
-                                            onKeyUp={toggleSelection}
-                                        />
+                                    <td className={classNames(["data-table-row-selector", selectable ? "selectable" : "non-selectable"])}>
+                                        {
+                                            selectable
+                                                ? (
+                                                    <VCheckbox
+                                                        checked={selectionCollection.contains(resource)}
+                                                        value={resource}
+                                                        onClick={toggleSelection}
+                                                        onKeyUp={toggleSelection}
+                                                    />
+                                                )
+                                                : <Icon name={"lock"}/>
+                                        }
                                     </td>
                                     {
                                         schema.filter(field => !field.hidden)

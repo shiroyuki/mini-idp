@@ -4,8 +4,8 @@ CREATE TABLE iam_scope (
   id VARCHAR PRIMARY KEY,
   name VARCHAR NOT NULL,
   description VARCHAR,
-  sensitive boolean,
-  fixed boolean
+  sensitive boolean DEFAULT false NOT NULL,
+  fixed BOOLEAN DEFAULT false NOT NULL
 );
 ALTER TABLE iam_scope ADD CONSTRAINT uniq_iam_scope_name UNIQUE (name);
 
@@ -14,7 +14,9 @@ DROP TABLE IF EXISTS iam_role CASCADE;
 CREATE TABLE iam_role (
   id VARCHAR PRIMARY KEY,
   name VARCHAR NOT NULL,
-  description VARCHAR
+  description VARCHAR,
+  sensitive boolean DEFAULT false NOT NULL,
+  fixed BOOLEAN DEFAULT false NOT NULL
 );
 ALTER TABLE iam_role ADD CONSTRAINT uniq_iam_role_name UNIQUE (name);
 
@@ -53,7 +55,8 @@ CREATE TABLE iam_policy (
   name VARCHAR NOT NULL,
   subjects JSONB NOT NULL,
   resource VARCHAR NOT NULL,
-  scopes JSONB NOT NULL
+  scopes JSONB NOT NULL,
+  fixed BOOLEAN DEFAULT false NOT NULL
 );
 ALTER TABLE iam_policy ADD CONSTRAINT uniq_iam_policy_name UNIQUE (name);
 

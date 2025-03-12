@@ -16,6 +16,9 @@ interface Prop {
         | "indeterminate_check_box"
         | "warning"
         | "lock"
+        | "check"
+        | "close"
+        | "fullscreen"
         | string;
     classes?: string[];
     style?: React.CSSProperties;

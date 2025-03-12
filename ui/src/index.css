@@ -122,7 +122,7 @@ button, a.btn {
 
     &.destructive {
         color: #fff;
-        background-color: var(--colourTriadicRed);
+        background-color: var(--colourDanger);
     }
 }
 
@@ -200,24 +200,49 @@ form {
 
     .data-table {
         flex: 1;
+        vertical-align: top;
         border-spacing: 0;
         border-top: 1px solid var(--darkGrey);
 
         th {
             text-align: left;
             padding: 8px 12px;
-            border-bottom: 1px solid var(--darkGrey);
+            border-bottom: 2px solid var(--darkGrey);
+
+            &.data-table-row-selector {
+                border-right: 1px dashed var(--grey);
+                text-align: right;
+                padding: 4px 8px;
+            }
         }
 
         td {
             text-align: left;
             padding: 8px 12px;
             border-bottom: 1px solid var(--grey);
+
+            &.data-table-row-selector {
+                border-right: 1px dashed var(--grey);
+                text-align: right;
+                padding: 4px 8px;
+
+                &.non-selectable {
+                    cursor: default;
+
+                    .icon {
+                        opacity: 0.1;
+                    }
+                }
+            }
         }
 
         td:empty::before {
             content: "null";
-            color: var(--grey);
+            background-color: var(--lightGrey);
+            color: var(--white);
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 12px;
         }
 
         tr:nth-child(2n + 1) td {
@@ -228,59 +253,55 @@ form {
             background-color: var(--white);
         }
     }
-}
 
-.foundation-tag {
-    display: inline-flex;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background-color: var(--lightGrey);
-}
-
-.data-table-container {
     .data-table-navigator {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 4px;
+        background-color: var(--darkGrey);
+
+        button, .btn {
+            color: var(--white);
+            border-radius: 0;
+            background-color: transparent;
+
+            &:hover, &:focus, &:active {
+                background-color: var(--veryDarkGrey);
+            }
+        }
 
         .data-table-navigator-primary {
             display: flex;
             flex-direction: row;
-
-            & > * {
-                margin-right: 4px;
-            }
         }
 
         .data-table-navigator-secondary {
             display: flex;
             flex-direction: row;
-
-            & > * {
-                margin-left: 4px;
-            }
         }
     }
 
-    .data-table {
-        .data-table-row-selector {
-            border-right: 1px dashed var(--grey);
-            text-align: right;
+    .data-table-field-type-list {
+        ul {
+            margin-left: 16px;
         }
     }
 
-    .data-table-row-selector {
-        &.non-selectable {
-            cursor: default;
-            opacity: 0.5;
-            /*color: var(--grey);*/
-        }
+    .data-table-field-type-boolean,
+    .data-table-field-type-object {
+        font-family: monospace;
+    }
+
+    .data-table-field-type-number,
+    .data-table-field-type-integer,
+    .data-table-field-type-float {
+        font-family: monospace;
+        text-align: right;
     }
 
     .data-table-deleter {
         display: flex;
         align-items: center;
-        margin-bottom: 4px;
+        padding: 8px 16px;
 
         button {
             margin-left: 4px;
@@ -295,20 +316,27 @@ form {
             font-weight: 700;
             padding: 2px 8px;
             margin-left: 8px;
-            background-color: var(--white);
-            color: var(--colourTriadicRed);
+            background-color: var(--colourDanger);
+            color: var(--white);
             border-radius: 16px;
         }
     }
 
-    .data-table-delete-confirmation-prompt {
+    .data-table-delete-message {
         display: flex;
         align-items: center;
 
         .icon {
-            color: var(--colourTriadicRed);
+            color: var(--colourDanger);
             margin-left: 4px;
             margin-right: 4px;
         }
     }
+}
+
+.foundation-tag {
+    display: inline-flex;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: var(--lightGrey);
 }

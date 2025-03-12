@@ -1,7 +1,7 @@
 from copy import deepcopy
 from math import floor
 from time import time
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Set
 
 from imagination.decorator.service import Service
 from jwt import ExpiredSignatureError, DecodeError
@@ -9,10 +9,11 @@ from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
 from midp.common.env_helpers import SELF_REFERENCE_URI
+from midp.common.policy_manager import PolicyResolver
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
-from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser
+from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser, IAMOAuthClient
 from midp.log_factory import get_logger_for_object
 from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
 
@@ -30,7 +31,8 @@ class TokenParser:
         claims: Dict[str, Any] = dict()
 
         try:
-            claims.update(self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
+            claims.update(
+                self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
         except ExpiredSignatureError:
             raise InvalidTokenError()
 
@@ -52,11 +54,13 @@ class TokenGenerationError(RuntimeError):
 class TokenManager:
     def __init__(self,
                  enigma: Enigma,
+                 policy_resolver: PolicyResolver,
                  user_dao: UserDao,
                  policy_dao: PolicyDao,
                  client_dao: ClientDao):
         self._logger = get_logger_for_object(self)
         self._enigma = enigma
+        self._policy_resolver = policy_resolver
         self._user_dao = user_dao
         self._policy_dao = policy_dao
         self._client_dao = client_dao
@@ -86,72 +90,29 @@ class TokenManager:
                          subject: IAMPolicySubject,
                          resource_url: Optional[str] = None,
                          requested_scopes: Optional[List[str]] = None) -> TokenSet:
-        user: Optional[IAMUser] = None
-
-        if subject.kind == 'service':
-            raise NotImplementedError('To be implemented')
-        else:  # kind = 'user'
-            user = self._user_dao.get(subject.subject)
-
-            if not user:
-                raise TokenGenerationError('access_denied')
-
-            print(f'PANDA: user = {user}')
-
-        subject_id: str = user.id
-
         resource_url = resource_url or self._self_reference_uri
-        requested_scopes = requested_scopes or []
 
-        if resource_url.endswith('/'):
-            # When the resource URL ends with "/", we will look for all policies tied
-            # to a resource URL starting with the given resource URL.
-            policy_iterator = self._policy_dao.select(
-                "resource LIKE :resource_url",
-                dict(resource_url=resource_url + r'%'),
-            )
-        else:
-            # When the trailing slash ("/") is not in the resource URL, this is a specific resource only.
-            policy_iterator = self._policy_dao.select(
-                "resource = :resource_url",
-                dict(resource_url=resource_url),
-            )
+        resolution = self._policy_resolver.evaluate(
+            resource_url=resource_url,
+            scopes=requested_scopes,
+            subjects=[subject],
+        )
 
-        policies_filtered_by_resource_url = [p for p in policy_iterator]
-
-        print(f'PANDA: policies_filtered_by_resource_url = {policies_filtered_by_resource_url}')
-
-        policies: List[IAMPolicy] = []
-
-        for policy in policies_filtered_by_resource_url:
-            for policy_subject in policy.subjects:
-                if user:
-                    if (
-                            (policy_subject.kind == 'user' and policy_subject.subject == user.email)
-                            or (policy_subject.kind == 'role' and policy_subject.subject in user.roles)
-                    ):
-                        policies.append(policy)
-                else:
-                    raise NotImplementedError()
-                ...
-
-        # print(f'PANDA: policies = {policies}')
-        #
-        # if not policies:
-        #     raise TokenGenerationError('access_denied')
+        granted_scopes: Set[str] = set()
+        for policy in resolution.policies:
+            granted_scopes.update(policy.scopes)
 
         current_time = time()
 
         # TODO Implement JTI issuing, validation, and invalidation.
-        access_claims = dict(sub=subject_id,
-                             roles=user.roles,
-                             # TODO provide all requested scopes from the policy.
-                             scope=' '.join(requested_scopes),
+        access_claims = dict(sub=subject.subject,
+                             psl=resolution.subjects,  # Policy Subject List
+                             scope=' '.join(sorted(granted_scopes)),
                              iss=self._self_reference_uri,
                              aud=resource_url,
                              exp=floor(current_time + ACCESS_TOKEN_TTL))
 
-        refresh_claims = dict(sub=subject_id,
+        refresh_claims = dict(sub=subject.subject,
                               scope='openid refresh',
                               iss=self._self_reference_uri,
                               aud=resource_url,
@@ -172,6 +133,11 @@ class TokenManager:
             )
         except (DecodeError, ExpiredSignatureError) as e:
             self._logger.error(f"Unable to parse this token: {token}")
-            raise InvalidTokenError() from e
+            message = f"Unexpected error while parsing {token}"
+            if isinstance(e, ExpiredSignatureError):
+                message = 'Token expired'
+            elif isinstance(e, DecodeError):
+                message = 'Token decode error'
+            raise InvalidTokenError(message) from e
 
         return claims

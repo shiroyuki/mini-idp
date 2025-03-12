@@ -11,10 +11,13 @@ import {GenericModel} from "../common/models";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
+import styles from "./ResourceManagerPage.module.css"
+
+export type PerResourcePermission = "read" | "write" | "delete";
+export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
 
 type ListPageProps = {
     title: string;
-    assertResourceIsReadOnly?: (item: GenericModel) => boolean;
 }
 
 type MainProps = {
@@ -22,6 +25,7 @@ type MainProps = {
     baseFrontendUri: string;
     schema: ResourceSchema[];
     listPage: ListPageProps;
+    getPermissions: PerResourcePermissionFetcher;
 }
 
 export const ResourceManagerPage: FC<MainProps> = ({
@@ -29,6 +33,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
                                                        baseFrontendUri,
                                                        schema,
                                                        listPage,
+                                                       getPermissions,
                                                    }: MainProps) => {
     const navigate = useNavigate();
     const {id} = useParams();
@@ -40,22 +45,8 @@ export const ResourceManagerPage: FC<MainProps> = ({
     ];
 
     const handleNewResourceCreation = useCallback((data: GenericModel) => {
-        const referenceKeys = schema
-            .filter(field => field.isReferenceKey)
-            .map(field => data[field.title as string]);
-
-        const primaryKeys = schema
-            .filter(field => field.isPrimaryKey)
-            .map(field => data[field.title as string]);
-
-        if (referenceKeys.length > 0) {
-            navigate(`${baseFrontendUri}/${referenceKeys[0]}`);
-        } else if (primaryKeys.length > 0) {
-            navigate(`${baseFrontendUri}/${primaryKeys[0]}`);
-        } else {
-            // TODO handle error/misconfiguration
-        }
-    }, [schema, navigate, baseFrontendUri]);
+        navigate(`${baseFrontendUri}/`);
+    }, [navigate, baseFrontendUri]);
 
     let body: ReactElement;
 
@@ -67,6 +58,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
                 schema={schema}
                 onCreate={handleNewResourceCreation}
                 returningUri={baseFrontendUri}
+                getPermissions={getPermissions}
             />
         )
     } else if (currentId !== undefined) {
@@ -76,6 +68,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
                 id={currentId}
                 baseBackendUri={baseBackendUri}
                 schema={schema}
+                getPermissions={getPermissions}
             />
         )
     } else {
@@ -84,7 +77,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
                 baseBackendUri={baseBackendUri}
                 baseFrontendUri={baseFrontendUri}
                 schema={schema}
-                assertResourceIsReadOnly={listPage.assertResourceIsReadOnly}
+                getPermissions={getPermissions}
             />
         );
     }
@@ -100,11 +93,12 @@ export const ResourceManagerPage: FC<MainProps> = ({
 }
 
 type SoloProps = {
-    id?: string;
-    baseBackendUri: string;
-    schema: ResourceSchema[];
-    returningUri?: string;
-    onCreate?: (data: GenericModel) => void;
+    id?: string,
+    baseBackendUri: string,
+    schema: ResourceSchema[],
+    returningUri?: string,
+    onCreate?: (data: GenericModel) => void,
+    getPermissions: PerResourcePermissionFetcher
 }
 
 const makeClientOptions = (additionals?: ClientOptions) => {
@@ -120,11 +114,14 @@ const makeClientOptions = (additionals?: ClientOptions) => {
     } as ClientOptions
 }
 
-export const SoloResource = ({id, baseBackendUri, schema, returningUri, onCreate}: SoloProps) => {
-    if (id === undefined && onCreate === undefined) {
-        throw new Error("Either specify the ID (for accessing an existing resource) or define onCreate (for creating a new resource)");
-    }
-
+export const SoloResource = ({
+                                 id,
+                                 baseBackendUri,
+                                 schema,
+                                 returningUri,
+                                 onCreate,
+                                 getPermissions
+                             }: SoloProps) => {
     const navigate = useNavigate();
 
     const [inFlight, setInFlight] = useState<boolean>(false);
@@ -242,16 +239,23 @@ export const SoloResource = ({id, baseBackendUri, schema, returningUri, onCreate
 }
 
 type ListProps = {
-    baseBackendUri: string;
-    baseFrontendUri: string;
-    schema: ResourceSchema[];
-    assertResourceIsReadOnly?: (item: GenericModel) => boolean;
+    baseBackendUri: string,
+    baseFrontendUri: string,
+    schema: ResourceSchema[],
+    getPermissions: PerResourcePermissionFetcher
 }
 
-const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIsReadOnly}: ListProps) => {
+type DataTableControllerMode = "navigator" | "deletion:init" | "deletion:in-progress";
+
+const ResourceList = ({
+                          baseBackendUri,
+                          baseFrontendUri,
+                          schema,
+                          getPermissions,
+                      }: ListProps) => {
     const [inFlight, setInFlight] = useState<number>(0);
-    const [deleterMode, setDeleterMode] = useState<"off" | "prompt" | "in-progress" | "complete">("off");
-    const [cacheMap, setCacheMap] = useState<{ [key: string]: any } | undefined>(undefined);
+    const [dataTableControllerMode, setDataTableControllerMode] = useState<DataTableControllerMode>("navigator");
+    const [cacheMap, setCacheMap] = useState<{ [key: string]: any }>({});
     const [resourceList, setResourceList] = useState<GenericModel[] | undefined>(undefined);
     const [selectionList, setSelectionList] = useState<GenericModel[]>([]);
     const primaryKeyList = schema
@@ -277,7 +281,7 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
         [selectionList, primaryKeyList]
     );
 
-    useEffect(() => {
+    const loadResources = useCallback(() => {
         for (const rawField of schema) {
             const field = rawField as ResourceSchema;
             if (field.items && field.listRendering) {
@@ -308,7 +312,11 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
                 setResourceList(data);
                 setInFlight(prevState => prevState - 1);
             });
-    }, []);
+    }, [schema, baseBackendUri]);
+
+    useEffect(() => {
+        loadResources();
+    }, [schema, baseBackendUri]);
 
     const toggleSelection = useCallback(
         (target: GenericModel, checked: boolean) => {
@@ -323,56 +331,191 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
 
     const toggleAllSelections = useCallback(
         (value: any, checked: boolean) => {
-            console.log("PANDA: value =", value, "; checked =", checked);
             if (checked) {
                 setSelectionList([
                     ...(resourceList || [])
-                        .filter(item => assertResourceIsReadOnly && !assertResourceIsReadOnly(item))
+                        .filter(resource => getPermissions(resource).includes("delete"))
                 ]);
             } else {
                 setSelectionList([]);
             }
         },
-        [setSelectionList, resourceList]
+        [setSelectionList, resourceList, getPermissions]
     )
 
     // @ts-ignore
     const askUserForDeleteConfirmation = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        setDeleterMode("prompt");
+        setDataTableControllerMode("deletion:init");
     }
 
     if (resourceList === undefined || cacheMap === undefined || inFlight > 0) {
         return <LinearLoadingAnimation label={"Loading..."}/>;
     }
 
-    return (
-        <div className="data-table-container">
+    const renderFieldValueAsList = (fieldKey: string, fieldData: any[], listRenderingOption: ListRenderingOptions) => {
+        return <ul>
             {
-                deleterMode !== "off" && (
+                (cacheMap[fieldKey] as any[])
+                    .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
+                    .map(loadedItem => listRenderingOption.transformForEditing(fieldData, loadedItem) as ListTransformedOption)
+                    .filter(loadedItem => loadedItem.checked)
+                    .map(item => (
+                        <li key={item.value}
+                            className={classNames([item.checked ? "selected" : "not-selected"])}>
+                            {item.label}
+                        </li>
+                    ))
+            }
+        </ul>
+    };
+
+    const renderFieldValueAsPrimitive = (field: ResourceSchema, fieldData: any) => {
+        let renderedValue: any;
+
+        if (fieldData === undefined || fieldData === null) {
+            return "";
+        }
+
+        switch (field.type) {
+            case "boolean":
+                renderedValue = fieldData ? "true" : "false";
+                break;
+            case "number":
+            case "integer":
+            case "float":
+                renderedValue = fieldData;
+                break;
+            case "object":
+                renderedValue = <span style={{whiteSpace: "pre-wrap"}}
+                                      dangerouslySetInnerHTML={{__html: JSON.stringify(fieldData)}}/>
+                break;
+            default:
+                renderedValue = fieldData;
+                break;
+        }
+
+        if (field.isReferenceKey) {
+            return <Link to={`${baseFrontendUri}/${fieldData}`}>{renderedValue}</Link>
+        } else {
+            return renderedValue;
+        }
+    }
+
+    const renderField = (field: ResourceSchema, resource: GenericModel) => {
+        const fieldKey = field.title as string;
+        const fieldData = resource[fieldKey];
+        const listRenderingOption = field.items && field.listRendering;
+
+        return (
+            <>
+                <td className={classNames([`data-table-field-type-${field.items ? "list" : field.type}`])}>{
+                    listRenderingOption !== undefined
+                        ? renderFieldValueAsList(fieldKey, fieldData, listRenderingOption as ListRenderingOptions)
+                        : renderFieldValueAsPrimitive(field, fieldData)
+                }</td>
+            </>
+        );
+    };
+
+    const renderResource = (resource: GenericModel) => {
+        const selectable = getPermissions(resource).includes("delete");
+        return (
+            <tr key={schema[0].title}>
+                <td className={classNames(["data-table-row-selector", selectable ? "selectable" : "non-selectable"])}>
+                    {
+                        selectable
+                            ? (
+                                <VCheckbox
+                                    disabled={dataTableControllerMode !== "navigator"}
+                                    checked={selectionCollection.contains(resource)}
+                                    value={resource}
+                                    onClick={toggleSelection}
+                                    onKeyUp={toggleSelection}
+                                />
+                            )
+                            : <Icon name={"fullscreen"}/>
+                    }
+                </td>
+                {
+                    schema.filter(field => !field.hidden)
+                        .map(field => renderField(field, resource))
+                }
+            </tr>
+        );
+    };
+
+    const writableResourceCount = resourceList
+        .filter(resource => getPermissions(resource).includes("delete"))
+        .length;
+
+    return (
+        <div className={classNames(["data-table-container", styles.localDataTable])}>
+            {
+                // Data Table Deleter
+                dataTableControllerMode.startsWith("deletion:") && (
                     <div className="data-table-deleter">
-                        <span className="data-table-delete-confirmation-prompt">
-                            <Icon name={"warning"}/>
-                            Continue to delete the selection{selectionCollection.size() && "s"}?
-                        </span>
-                        <span className={"spacer"}></span>
-                        <button className={"data-table-delete-confirm destructive"}>Proceed</button>
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setDeleterMode("off");
-                            }}
-                        >
-                            Not now
-                        </button>
+                        {
+                            dataTableControllerMode === "deletion:init" && (
+                                <>
+                                    <span className="data-table-delete-message">
+                                        <Icon name={"warning"}/>
+                                        Continue to delete the selection{selectionCollection.size() && "s"}?
+                                    </span>
+                                    <span className={"spacer"}></span>
+                                    <button
+                                        className={"data-table-delete-confirm destructive"}
+                                        // @ts-ignore
+                                        onClick={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+
+                                            setDataTableControllerMode("deletion:in-progress");
+
+                                            for (const selection of selectionList) {
+                                                await http.send(
+                                                    "delete",
+                                                    `${baseBackendUri}/${selection.id}`,
+                                                    makeClientOptions()
+                                                );
+                                                // TODO Implement proper error handling.
+                                            }
+
+                                            setSelectionList([]);
+                                            setDataTableControllerMode("navigator");
+                                            loadResources();
+                                        }}
+                                    >
+                                        Proceed
+                                    </button>
+                                    <button
+                                        onClick={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setDataTableControllerMode("navigator");
+                                        }}
+                                    >
+                                        Not now
+                                    </button>
+                                </>
+                            )
+                        }
+
+                        {
+                            dataTableControllerMode === "deletion:in-progress" && (
+                                <>
+                                    <LinearLoadingAnimation label={"Deleting..."}/>
+                                </>
+                            )
+                        }
                     </div>
                 )
             }
 
             {
-                deleterMode === "off" && (
+                // Data Table Navigator
+                dataTableControllerMode === "navigator" && (
                     <div className="data-table-navigator">
                         <div className="data-table-navigator-primary">
                             <a href={`#${baseFrontendUri}/new`} className={"btn"}>
@@ -380,16 +523,16 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
                                 <span>Add</span>
                             </a>
                             {
-                                !selectionCollection.isEmpty() && deleterMode === "off" && (
+                                !selectionCollection.isEmpty() && (
                                     <button
-                                        className={"data-table-delete-initiator destructive"}
+                                        className={"data-table-delete-initiator"}
                                         onClick={askUserForDeleteConfirmation}
                                     >
                                         <Icon name={"delete"}/>
                                         <span>Remove</span>
                                         <span className={"data-table-delete-counter"}>
-                                    {selectionCollection.size()}
-                                </span>
+                                            {selectionCollection.size()}
+                                        </span>
                                     </button>
                                 )
                             }
@@ -399,21 +542,20 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
                 )
             }
 
+            {
+                // Data Table View
+            }
             <table className={classNames(["data-table"])}>
                 <thead>
                 <tr>
                     <th className={"data-table-row-selector"}>
                         <VCheckbox
+                            disabled={dataTableControllerMode !== "navigator"}
                             checked={
                                 selectionCollection.isEmpty()
                                     ? false
                                     : (
-                                        (
-                                            selectionCollection.size()
-                                            === resourceList
-                                                .filter(resource => assertResourceIsReadOnly && !assertResourceIsReadOnly(resource))
-                                                .length
-                                        )
+                                        selectionCollection.size() === writableResourceCount
                                             ? true
                                             : "indeterminate"
                                     )
@@ -430,58 +572,7 @@ const ResourceList = ({baseBackendUri, baseFrontendUri, schema, assertResourceIs
                     }
                 </tr>
                 </thead>
-                <tbody>
-                {
-                    resourceList.map(
-                        resource => {
-                            const selectable = assertResourceIsReadOnly && !assertResourceIsReadOnly(resource);
-                            return (
-                                <tr key={schema[0].title}>
-                                    <td className={classNames(["data-table-row-selector", selectable ? "selectable" : "non-selectable"])}>
-                                        {
-                                            selectable
-                                                ? (
-                                                    <VCheckbox
-                                                        checked={selectionCollection.contains(resource)}
-                                                        value={resource}
-                                                        onClick={toggleSelection}
-                                                        onKeyUp={toggleSelection}
-                                                    />
-                                                )
-                                                : <Icon name={"lock"}/>
-                                        }
-                                    </td>
-                                    {
-                                        schema.filter(field => !field.hidden)
-                                            .map(field => {
-                                                const fieldKey = field.title as string;
-                                                const fieldData = resource[fieldKey];
-                                                const listRenderingOption = field.items && field.listRendering;
-                                                return (
-                                                    <>
-                                                        <td className={classNames([`data-table-field-type-${field.type}`])}>{
-                                                            listRenderingOption !== undefined
-                                                                ? (cacheMap[fieldKey] as any[])
-                                                                    .map(loadedItem => listRenderingOption.transformForEditing(fieldData, loadedItem) as ListTransformedOption)
-                                                                    .filter(loadedItem => loadedItem.checked)
-                                                                    .map(loadedItem => listRenderingOption.transformForReading(loadedItem))
-                                                                : (
-                                                                    field.isReferenceKey
-                                                                        ? <Link
-                                                                            to={`${baseFrontendUri}/${fieldData}`}>{fieldData}</Link>
-                                                                        : fieldData
-                                                                )
-                                                        }</td>
-                                                    </>
-                                                );
-                                            })
-                                    }
-                                </tr>
-                            )
-                        }
-                    )
-                }
-                </tbody>
+                <tbody>{resourceList.map(renderResource)}</tbody>
             </table>
         </div>
     );

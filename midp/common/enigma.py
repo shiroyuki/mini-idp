@@ -60,6 +60,8 @@ class Enigma:
 
     def decode(self, token: str, issuer: Optional[str] = None, audience: Optional[str] = None) -> Dict[str, Any]:
         """ Decode the JWT string """
+        assert isinstance(token, str), "The token must be a string. Given {} instead".format(type(token))
+
         self._assert_cryptographic_capabilities()
 
         return jwt.decode(

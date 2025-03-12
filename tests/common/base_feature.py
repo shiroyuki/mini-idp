@@ -1,4 +1,3 @@
-import asyncio
 import os.path
 from typing import Callable, List, Dict, Any
 from unittest import TestCase
@@ -6,22 +5,22 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 import yaml
-from dotenv import load_dotenv
 from requests import Session, Response
 
-from midp.app.web_client import MiniIDP, ClientOutput, RestAPIClient, WebClientLocalStorageManager
+from midp.app.web_client import MiniIDP, ClientOutput, WebClientLocalStorageManager
 from midp.common.env_helpers import optional_env
 from midp.iam.models import IAMOAuthClient
 from midp.log_factory import get_logger_for
 from midp.models import GrantType
 from midp.snapshot.models import AppSnapshot
+from midp.snapshot.utils import bootstrap
 
 
 class TestConfig:
     TEST_BASE_URL = optional_env('TEST_BASE_URL', 'http://localhost:8081/')
 
     # Load the test snapshot.
-    with open(optional_env('TEST_CONFIG_FILE_PATH', 'config-auto-testing.yml'), 'r') as f:
+    with open(optional_env('TEST_CONFIG_FILE_PATH', 'snapshot-for-testing.yml'), 'r') as f:
         TEST_BASE_CONFIG: AppSnapshot = AppSnapshot(**yaml.load(f.read(), Loader=yaml.SafeLoader))
 
 
@@ -69,28 +68,30 @@ class GenericDeferrableFeature:
 
 
 class GenericAppFeature(GenericDeferrableFeature, TestCase):
-    _env_loaded: bool = False
-
     @classmethod
     def setUpClass(cls):
         cls._log = get_logger_for(cls.__name__)
         cls._http_session = requests.Session()
         cls.defer_after_all(cls._http_session.close)
 
-        if not cls._env_loaded:
-            load_dotenv()
-            cls._env_loaded = True
-
         cls._test_config = TestConfig.TEST_BASE_CONFIG.model_copy()
+
+        bootstrap(
+            clear_operational_data=True,
+            clear_session_data=False,
+            snapshots=[cls._test_config],
+        )
 
         cls._client_output = _ClientOutput()
         cls._local_storage_manager = WebClientLocalStorageManager(
             os.path.join(os.path.dirname(__file__), '.test_client'))
+
         cls._client = MiniIDP(TestConfig.TEST_BASE_URL,
                               resource_url=cls._get_testing_client().audience,
                               output=cls._client_output,
                               local_storage_manager=cls._local_storage_manager)
-        cls._client.restore(cls._test_config)
+
+        # cls._client.restore(cls._test_config)
         cls.defer_after_all(cls._remove_test_resources)
 
     @classmethod
@@ -102,23 +103,9 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
 
     @classmethod
     def _remove_test_resources(cls):
-        async def do_delete(rest_api: RestAPIClient, id: str):
-            await asyncio.to_thread(rest_api.delete, id)
-
-        coroutines = []
-        for rest_api_name in ('clients',
-                              'policies',
-                              'roles',
-                              'scopes',
-                              'users',):
-            rest_api: RestAPIClient = getattr(cls._client, rest_api_name)
-            resources = getattr(cls._test_config, rest_api_name)
-            coroutines.extend([do_delete(rest_api, item.id) for item in resources])
-
-        async def delete_many():
-            await asyncio.gather(*coroutines)
-
-        asyncio.run(delete_many())
+        bootstrap(
+            clear_operational_data=True,
+        )
 
     @classmethod
     def _authenticate_as(cls, user_name: str):
@@ -136,13 +123,16 @@ class GenericAppFeature(GenericDeferrableFeature, TestCase):
                                 data=dict(username=username, password=password))
 
         if response.status_code != 200:
-            cls._log.error(
-                f"Attempt to authenticate {dict(username=username, password=password)} and received HTTP {response.status_code} {response.text}")
-            import time
-            time.sleep(60)
+            cls._log.error(f"Attempt to authenticate {dict(username=username, password=password)} and received HTTP {response.status_code} {response.text}")
             raise AssertionError(f'Failed to log in with {dict(username=username, password=password)}')
 
         return response
+
+    @classmethod
+    def _authenticate_with_client_credentials(cls, client_name: str = 'test_app'):
+        oauth_client: IAMOAuthClient = cls._get_testing_client()
+
+        cls._client.authenticate_with_client_credential(oauth_client.name, oauth_client.secret)
 
     @classmethod
     def _initiate_client_with_device_code_flow(cls, user_name: str = 'test_admin'):

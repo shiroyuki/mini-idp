@@ -52,6 +52,6 @@
 }
 
 .signOutButton {
-    color: var(--colourTriadicRed) !important;
+    color: var(--colourDanger) !important;
     margin-bottom: 16px !important;
 }

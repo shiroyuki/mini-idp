@@ -3,6 +3,7 @@ import './App.scss';
 import {useCallback, useEffect, useState} from "react";
 import {AppState, BootingState, convertToResponseInfo, ResponseInfo} from "./common/app-state";
 import {LinearLoadingAnimation} from "./components/loaders";
+import {ejectToLoginScreen} from "./common/helpers";
 
 const FEATURE_PERIODIC_SESSION_CHECK = false;
 
@@ -27,9 +28,7 @@ const runSessionValidation = () => {
 }
 
 function App() {
-    const [periodicSessionVerificationTaskRef, setPeriodicSessionVerificationTaskRef] = useState<any>(null);
-    const routerLocation = useLocation();
-    const currentlyOnLoginScreen = routerLocation.pathname === "/login";
+    const [periodicSessionVerificationTaskRef, setPeriodicSessionVerificationTaskRef] = useState<any>(null); // TODO replace with useRef.
     const [currentAppState, setCurrentAppState] = useState<AppState>({
         status: "idle",
         inFlightTaskCount: 0,
@@ -37,7 +36,6 @@ function App() {
         completeTaskCount: 0,
         totalTaskCount: 0,
         clearSession: () => {
-
             setCurrentAppState(prevState => {
                 return {
                     ...prevState,
@@ -54,73 +52,75 @@ function App() {
 
     // Note: Not using the callback hook due to recursion.
     const verifySession = (runningPlan: "on-startup" | "periodic" | "manual") => {
-        runSessionValidation()
-            .then(response => {
-                const responseOk = response.status === 200
-                const updatedContent = parseJsonOrNull(response);
-                let newStatus: BootingState = "init";
+        fetch("/oauth/me/session")
+            .then(pingResponse => {
+                convertToResponseInfo(pingResponse)
+                    .then(response => {
+                        const responseOk = response.status === 200
+                        const updatedContent = parseJsonOrNull(response);
+                        let newStatus: BootingState = "init";
 
-                if (responseOk) {
-                    newStatus = "ready";
-                } else if (response.status === 401) {
-                    if (currentAppState.status !== "login-required") {
-                        newStatus = "login-required";
-                    }
-                } else {
-                    newStatus = "error";
-                }
-
-                setCurrentAppState(prevState => {
-                    const newState: AppState = {
-                        ...prevState,
-                        status: newStatus,
-                        sessionInfo: updatedContent,
-                        runSessionValidation: () => verifySession("manual"),
-                    };
-
-                    if (runningPlan === "on-startup") {
-                        newState.inFlightTaskCount = prevState.inFlightTaskCount - 1;
-                        newState.errorTaskCount = prevState.errorTaskCount + (responseOk ? 0 : 1);
-                        newState.completeTaskCount = prevState.completeTaskCount + (responseOk ? 1 : 0);
-                    }
-
-                    return newState;
-                });
-
-                return newStatus;
-            })
-            .then(newStatus => {
-                if (newStatus === "ready") {
-                    if (periodicSessionVerificationTaskRef === null) {
-                        if (FEATURE_PERIODIC_SESSION_CHECK) {
-                            setPeriodicSessionVerificationTaskRef(setInterval(() => verifySession("periodic"), 60000));
+                        if (responseOk) {
+                            newStatus = "ready";
+                        } else if (response.status === 401) {
+                            if (currentAppState.status !== "login-required") {
+                                newStatus = "login-required";
+                            }
                         } else {
-                            console.warn("Periodic session verification: DRY-RUN: Presumably ACTIVATED");
-                            setPeriodicSessionVerificationTaskRef("faux-periodic-task-id");
+                            newStatus = "error";
                         }
-                    } else {
-                        // For debugging only
-                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
-                            console.warn("Periodic session verification: DRY-RUN: Already activated");
-                        }
-                    }
-                } else {
-                    if (periodicSessionVerificationTaskRef === null) {
-                        // For debugging only
-                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
-                            console.warn("Periodic session verification: DRY-RUN: Already deactivated");
-                        }
-                    } else {
-                        if (!FEATURE_PERIODIC_SESSION_CHECK) {
-                            console.warn("Periodic session verification: DRY-RUN: Presumably DEACTIVATED");
+
+                        setCurrentAppState(prevState => {
+                            const newState: AppState = {
+                                ...prevState,
+                                status: newStatus,
+                                sessionInfo: updatedContent,
+                                runSessionValidation: () => verifySession("manual"),
+                            };
+
+                            if (runningPlan === "on-startup") {
+                                newState.inFlightTaskCount = prevState.inFlightTaskCount - 1;
+                                newState.errorTaskCount = prevState.errorTaskCount + (responseOk ? 0 : 1);
+                                newState.completeTaskCount = prevState.completeTaskCount + (responseOk ? 1 : 0);
+                            }
+
+                            return newState;
+                        });
+
+                        return newStatus;
+                    })
+                    .then(newStatus => {
+                        if (newStatus === "ready") {
+                            if (periodicSessionVerificationTaskRef === null) {
+                                if (FEATURE_PERIODIC_SESSION_CHECK) {
+                                    setPeriodicSessionVerificationTaskRef(setInterval(() => verifySession("periodic"), 60000));
+                                } else {
+                                    console.warn("Periodic session verification: DRY-RUN: Presumably ACTIVATED");
+                                    setPeriodicSessionVerificationTaskRef("faux-periodic-task-id");
+                                }
+                            } else {
+                                // For debugging only
+                                if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                                    console.warn("Periodic session verification: DRY-RUN: Already activated");
+                                }
+                            }
                         } else {
-                            clearInterval(periodicSessionVerificationTaskRef);
+                            if (periodicSessionVerificationTaskRef === null) {
+                                // For debugging only
+                                if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                                    console.warn("Periodic session verification: DRY-RUN: Already deactivated");
+                                }
+                            } else {
+                                if (!FEATURE_PERIODIC_SESSION_CHECK) {
+                                    console.warn("Periodic session verification: DRY-RUN: Presumably DEACTIVATED");
+                                } else {
+                                    clearInterval(periodicSessionVerificationTaskRef);
+                                }
+                                setPeriodicSessionVerificationTaskRef(null);
+                            }
                         }
-                        setPeriodicSessionVerificationTaskRef(null);
-                    }
-                }
-            })
-        ;
+                    });
+            });
     };
 
     const getUpdatedServiceInfo = useCallback(() => {

@@ -15,6 +15,7 @@ interface Feedback {
     type: string;
     message?: AuthenticationResponse | string | null;
 }
+
 interface Principle {
     id: string
     name: string
@@ -147,9 +148,11 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
                             <>
                                 <h3>Unable to log in</h3>
                                 <p>{
+                                    // @ts-ignore
                                     (feedback.message && feedback.message.error)
-                                    ? <>{feedback.message.error_description || feedback.message.error}</>
-                                    : <>{feedback.type}: {feedback.message || "Unknown"}</>
+                                        // @ts-ignore
+                                        ? <>{feedback.message.error_description || feedback.message.error}</>
+                                        : <>{feedback.type}: {feedback.message || "Unknown"}</>
                                 }</p>
                                 <button onClick={() => {
                                     setFeedback(null);

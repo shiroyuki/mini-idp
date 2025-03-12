@@ -48,7 +48,7 @@ async def intercept_request_response(request: Request, call_next):
         content = ''
         if IN_DEBUG_MODE:
             data = traceback.format_exc()
-            log.warning(f'PANDA: On Security: Exception: {data}')
+            log.warning(f'On Security: Exception: {data}')
         response = Response(status_code=401, content=content)
     response.headers['Server'] = f'{static_info.ARTIFACT_ID}/{static_info.VERSION}'
 

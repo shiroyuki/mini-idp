@@ -7,11 +7,16 @@
     color: var(--black);
 }
 
-.vCheckbox:focus {
-}
+.vCheckboxDisabled {
+    &.vCheckboxYes {
+    }
 
-.vCheckboxInFlight {
-    opacity: 0.8;
+    &.vCheckboxNo {
+        opacity: 0.1;
+    }
+
+    &.vCheckboxIntermediate {
+    }
 }
 
 .vSwitch {

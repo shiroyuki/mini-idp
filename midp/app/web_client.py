@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from time import sleep, time
-from typing import TypeVar, Generic, List, Type, Dict, Any, Optional
+from typing import TypeVar, Generic, List, Type, Dict, Any, Optional, Iterable
 from urllib.parse import urljoin, quote_plus
 
 import requests
@@ -14,19 +14,21 @@ from requests import Response, Session
 
 from midp.common.enigma import Enigma
 from midp.common.env_helpers import optional_env
-from midp.common.obj_patcher import SimpleJsonPatchOperation
+from midp.common.obj_patcher import PatchOperation
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
 from midp.log_factory import get_logger_for, get_logger_for_object
 from midp.models import GrantType
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
 from midp.snapshot.models import AppSnapshot
 
+mod_log = get_logger_for('midp.app.web_client')
 T = TypeVar('T')
 
 
 def _compute_default_context_name(base_url: str, resource_url: str) -> str:
     enigma = Enigma()
-    return enigma.compute_hash(f'base_url={base_url};resource_url={resource_url}')
+    pre_hash_text = f'base_url={base_url};resource_url={resource_url}'
+    return enigma.compute_hash(pre_hash_text)
 
 
 class WebClientSession(BaseModel):
@@ -166,13 +168,16 @@ def _assert_response(response: Response, status_codes: List[int]):
             raise ServerError(response)
 
 
+# TODO The constructor needs refactoring.
 class RestAPIClient(Generic[T]):
     def __init__(self,
+                 root_url: str,
                  base_url: str,
                  resource_url: Optional[str],
                  model_class: Type[T],
                  local_storage_manager: WebClientLocalStorageManager):
         self._log = get_logger_for(f'REST:{model_class.__name__}')
+        self._root_url = root_url
         self._base_url = base_url
         self._resource_url = resource_url
         self._model_class = model_class
@@ -185,12 +190,17 @@ class RestAPIClient(Generic[T]):
         http_session: Session = Session()
         http_session.headers.update({'Content-Type': 'application/json'})
 
-        context_name = _compute_default_context_name(self._base_url, self._resource_url)
+        context_name = _compute_default_context_name(self._root_url, self._resource_url)
 
         client_session = self._local_storage_manager.load_session(context_name=context_name)
 
+        self._log.debug(f'Use context: {context_name}')
+        self._log.debug(f'Has session?: {"Yes" if client_session else "No"}')
+
         if client_session:
             http_session.headers.update({'Authorization': f'Bearer {client_session.access_token}'})
+        else:
+            self._log.info("Initiated a new ANONYMOUS session")
 
         return http_session
 
@@ -201,18 +211,18 @@ class RestAPIClient(Generic[T]):
 
         return [self._model_class(**i) for i in response.json()]
 
-    def get(self, id: str) -> T:
-        response = self._new_session().get(self._base_url + id)
+    def get(self, id: str, /, view_secret: bool = False) -> T:
+        response = self._new_session()\
+            .get(self._base_url + id, headers={'X-Access-Level': 'full'} if view_secret else None)
         _assert_response(response, [200])
         return self._model_class(**response.json())
 
     def create(self, data: T) -> T:
-        typed_data: BaseModel = data
         response = self._new_session().post(self._base_url, json=data.model_dump())
         _assert_response(response, [200])
         return self._model_class(**response.json())
 
-    def patch(self, id: str, operations: List[SimpleJsonPatchOperation]):
+    def patch(self, id: str, operations: List[PatchOperation]):
         assert operations and len(operations) > 0, 'There must be at least one operation.'
 
         response = self._new_session().put(self._base_url + id, json=[o.model_dump() for o in operations])
@@ -299,30 +309,35 @@ class MiniIDP:
 
         # REST API Clients
         self._clients: RestAPIClient[IAMOAuthClient] = RestAPIClient(
+            self._base_url,
             urljoin(self._base_url, 'rest/clients'),
             self._resource_url,
             IAMOAuthClient,
             self._local_storage_manager
         )
         self._policies: RestAPIClient[IAMPolicy] = RestAPIClient(
+            self._base_url,
             urljoin(self._base_url, 'rest/policies'),
             self._resource_url,
             IAMPolicy,
             self._local_storage_manager
         )
         self._roles: RestAPIClient[IAMRole] = RestAPIClient(
+            self._base_url,
             urljoin(self._base_url, 'rest/roles'),
             self._resource_url,
             IAMRole,
             self._local_storage_manager
         )
         self._scopes: RestAPIClient[IAMScope] = RestAPIClient(
+            self._base_url,
             urljoin(self._base_url, 'rest/scopes'),
             self._resource_url,
             IAMScope,
             self._local_storage_manager
         )
         self._users: RestAPIClient[IAMUser] = RestAPIClient(
+            self._base_url,
             urljoin(self._base_url, 'rest/users'),
             self._resource_url,
             IAMUser,
@@ -370,6 +385,49 @@ class MiniIDP:
             _assert_response(response, [200])
             self._openid_config = OpenIDConfiguration(**response.json())
         return self._openid_config
+
+    def authenticate_with_client_credential(self,
+                                            client_id: str,
+                                            client_secret: str,
+                                            scopes: Optional[Iterable[str]] = None,
+                                            resource_url: Optional[str] = None):
+        openid_config = self.get_openid_configuration()
+        actual_resource_url = resource_url or self._resource_url
+
+        data = {
+            k: v
+            for k, v in dict(
+                client_id=client_id,
+                client_secret=client_secret,
+                scope=' '.join(scopes or []),
+                grant_type='client_credentials',
+                resource_url=resource_url
+            ).items()
+            if v is not None
+        }
+
+        token_exchange_response = requests.post(openid_config.token_endpoint, data=data)
+        _assert_response(token_exchange_response, [200])
+
+        token_exchange = TokenExchangeResponse(**token_exchange_response.json())
+        context_name = _compute_default_context_name(base_url=self._base_url, resource_url=self._resource_url)
+
+        self._local_storage_manager.set_context(
+            context_name=context_name,
+            context=WebClientContextConfig(
+                base_url=self._base_url,
+                resource_url=actual_resource_url,
+            ),
+            switch_immediately=True,
+        )
+
+        self._local_storage_manager.save_session(
+            context_name=context_name,
+            session=WebClientSession(
+                access_token=token_exchange.access_token,
+                refresh_token=token_exchange.refresh_token,
+            ),
+        )
 
     def initiate_device_code(self, client_id: str):
         openid_config = self.get_openid_configuration()

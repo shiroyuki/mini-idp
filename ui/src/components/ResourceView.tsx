@@ -68,7 +68,6 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
 
             if (checked) {
                 updatedData.push(value);
-                console.log("PANDA: CHECKED", value)
                 onUpdate(schema.title as string, updatedData);
             } else {
                 updatedData = updatedData
@@ -106,7 +105,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 }
 
                 return (
-                    <>
+                    <div className={classNames([styles.controller])} data-type={"list"}>
                         {fieldLabel}
                         <ul className={classNames([listingClassNames])}>
                             {
@@ -133,14 +132,14 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                                     })
                             }
                         </ul>
-                    </>
+                    </div>
                 );
             }
 
         }
     } else if (schema.type === "boolean") {
         return (
-            <>
+            <div className={classNames([styles.controller])} data-type={schema.type}>
                 <input
                     id={schema.title}
                     {...props}
@@ -153,13 +152,14 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                     }}
                 />
                 {fieldLabel}
-            </>
+            </div>
         );
     } else if (schema.sensitive) {
         return (
-            <>
+            <div className={classNames([styles.controller])} data-type={schema.type}>
                 {fieldLabel}
-                <div className={classNames([styles.sensitiveInput, showSecret ? styles.secretRevealed : styles.secretHidden])}>
+                <div
+                    className={classNames([styles.sensitiveInput, showSecret ? styles.secretRevealed : styles.secretHidden])}>
                     <input
                         id={schema.title}
                         {...props}
@@ -176,11 +176,11 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                         <Icon name={showSecret ? "visibility_off" : "visibility"}/>
                     </button>
                 </div>
-            </>
+            </div>
         );
     } else {
         return (
-            <>
+            <div className={classNames([styles.controller])} data-type={schema.type}>
                 {fieldLabel}
                 <input
                     id={schema.title}
@@ -189,7 +189,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                     value={data}
                     onChange={handleUpdate}
                 />
-            </>
+            </div>
         );
     }
 }
@@ -214,6 +214,7 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
     }
 
     const handleFormSubmission = useCallback(
+        // @ts-ignore
         async (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -231,6 +232,7 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
         [onSubmit, setMode]
     );
 
+    // @ts-ignore
     const startEditing = useCallback((e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -278,14 +280,12 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
                             }
                         })
                         .map(f => (
-                            <div className={styles.controller}>
-                                <FieldInput
-                                    key={f.title}
-                                    schema={f}
-                                    data={(data !== undefined && data !== null) ? data[f.title as string] : undefined}
-                                    onUpdate={inWritingMode ? onUpdate : undefined}
-                                />
-                            </div>
+                            <FieldInput
+                                key={f.title}
+                                schema={f}
+                                data={(data !== undefined && data !== null) ? data[f.title as string] : undefined}
+                                onUpdate={inWritingMode ? onUpdate : undefined}
+                            />
                         ))
                 }
             </div>

@@ -1,5 +1,9 @@
-from typing import Optional
+import json
+import os
+import re
+from typing import Optional, Any, Dict, List
 
+import yaml
 from imagination import container
 
 from midp.common.env_helpers import SELF_REFERENCE_URI, BOOTING_OPTIONS, required_env, optional_env
@@ -8,9 +12,13 @@ from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
-from midp.iam.models import IAMScope, IAMUser, IAMPolicy, IAMPolicySubject, IDP_OWNER, IDP_ADMIN, IDP_USER
+from midp.iam.models import IAMScope, IAMUser, IAMPolicy, IAMPolicySubject, PredefinedRole, \
+    PredefinedScope, PredefinedPolicy
+from midp.log_factory import get_logger_for
 from midp.rds import DataStore, DataStoreSession
 from midp.snapshot.models import AppSnapshot
+
+log = get_logger_for("snapshot.utils")
 
 
 def restore_from_snapshot(main_config: AppSnapshot, session: Optional[DataStoreSession] = None):
@@ -58,84 +66,144 @@ def export_snapshot() -> AppSnapshot:
     )
 
 
-if BOOTING_OPTIONS:
-    if 'bootstrap' not in BOOTING_OPTIONS:
-        raise RuntimeError(f'The "bootstrap" option is not given.')
+class MissingSnapshotFileError(IOError):
+    pass
 
-    COMMON_SCOPES = [
-        # OpenID scopes
-        IAMScope(name='openid'),
-        IAMScope(name='profile'),
-        # App-specific Scopes
-        IAMScope(name='idp.client.read'),
-        IAMScope(name='idp.policy.read'),
-        IAMScope(name='idp.role.read'),
-        IAMScope(name='idp.scope.read'),
-        IAMScope(name='idp.user.read'),
-        IAMScope(name='idp.user.write'),
-    ]
 
-    ADMIN_SCOPES = [
-        IAMScope(name='idp.admin'),
-        IAMScope(name='idp.client.read_sensitive'),
-        IAMScope(name='idp.client.write'),
-        IAMScope(name='idp.policy.write'),
-        IAMScope(name='idp.role.write'),
-        IAMScope(name='idp.scope.write'),
-    ]
+class UnsupportedSnapshotFileFormatError(RuntimeError):
+    pass
 
+
+def _clear_operational_data(session: Optional[DataStoreSession] = None):
+    if not session:
+        datastore: DataStore = container.get(DataStore)
+        session = datastore.session()
+
+    log.debug("Resetting the data... [IN PROGRESS]")
+    for reset_statement in [
+        'DELETE FROM iam_scope WHERE id IS NOT NULL',
+        'DELETE FROM iam_role WHERE id IS NOT NULL',
+        'DELETE FROM iam_user WHERE id IS NOT NULL',
+        'DELETE FROM iam_client WHERE id IS NOT NULL',
+        'DELETE FROM iam_policy WHERE id IS NOT NULL',
+    ]:
+        session.execute_without_result(reset_statement)
+    log.debug("Resetting the data... [COMPLETE]")
+
+
+def _clear_session_data(session: Optional[DataStoreSession] = None):
+    if not session:
+        datastore: DataStore = container.get(DataStore)
+        session = datastore.session()
+
+    log.debug("Clearing the sessions... [IN PROGRESS]")
+    for reset_statement in [
+        'DELETE FROM kv WHERE k IS NOT NULL',
+    ]:
+        session.execute_without_result(reset_statement)
+    log.debug("Clearing the sessions... [COMPLETE]")
+
+
+def bootstrap(clear_operational_data: bool = False,
+              clear_session_data: bool = False,
+              snapshot_files: Optional[List[str]] = None,
+              snapshots: Optional[List[AppSnapshot]] = None):
     BOOTSTRAP_SNAPSHOT = AppSnapshot(
-        scopes=COMMON_SCOPES + ADMIN_SCOPES,
-        roles=[
-            IDP_OWNER,
-            IDP_ADMIN,
-            IDP_USER,
-        ],
+        scopes=[scope.value for scope in PredefinedScope],
+        roles=[role.value for role in PredefinedRole],
         users=[
             IAMUser(
                 id=optional_env('MINI_IDP_BOOTSTRAP_OWNER_USER_ID', default=None),
                 name=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_NAME'),
                 email=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_EMAIL'),
                 password=required_env('MINI_IDP_BOOTSTRAP_OWNER_USER_PASSWORD'),
-                roles=[IDP_OWNER.name],
+                roles=[PredefinedRole.IDP_ROOT.value.name],
             ),
         ],
         clients=[],
-        policies=[
-            IAMPolicy(
-                name='idp.admins',
-                resource=SELF_REFERENCE_URI,
-                subjects=[
-                    IAMPolicySubject(kind='role', subject=IDP_OWNER.name),
-                    IAMPolicySubject(kind='role', subject=IDP_ADMIN.name),
-                ],
-                scopes=[s.name for s in COMMON_SCOPES + ADMIN_SCOPES],
-            ),
-            IAMPolicy(
-                name='idp.users',
-                resource=SELF_REFERENCE_URI,
-                subjects=[IAMPolicySubject(kind='role', subject=IDP_USER.name)],
-                scopes=[s.name for s in COMMON_SCOPES],
-            ),
-        ],
+        policies=[policy.value for policy in PredefinedPolicy],
     )
 
     datastore: DataStore = container.get(DataStore)
     session: DataStoreSession = datastore.session()
 
-    if 'bootstrap:reset' in BOOTING_OPTIONS:
-        for reset_statement in [
-            'DELETE FROM iam_scope WHERE id IS NOT NULL',
-            'DELETE FROM iam_role WHERE id IS NOT NULL',
-            'DELETE FROM iam_user WHERE id IS NOT NULL',
-            'DELETE FROM iam_client WHERE id IS NOT NULL',
-            'DELETE FROM iam_policy WHERE id IS NOT NULL',
-            'DELETE FROM kv WHERE k IS NOT NULL',
-        ]:
-            session.execute_without_result(reset_statement)
+    if clear_operational_data:
+        _clear_operational_data(session)
 
+    if clear_session_data:
+        _clear_session_data(session)
+
+    # Restore from a snapshot.
+    log.debug("Bootstrapping with the pre-defined resources... [IN PROGRESS]")
     restore_from_snapshot(BOOTSTRAP_SNAPSHOT, session=session)
+    log.debug("Bootstrapping with the pre-defined resources... [COMPLETE]")
+
+    # Restore from a file.
+    if snapshot_files:
+        loaded_snapshot_count: int = 0
+        total_loaded_snapshot_count: int = len(snapshot_files)
+
+        log.debug(f"Restoring with the snapshot files... [STARTING]")
+        for snapshot_file in snapshot_files:
+            actual_snapshot_file = os.path.abspath(snapshot_file)
+
+            if os.path.exists(actual_snapshot_file):
+                with open(actual_snapshot_file, 'r') as f:
+                    snapshot_data: Dict[str, Any]
+                    snapshot_data_raw = f.read()
+
+                    if actual_snapshot_file.lower().endswith('.json'):
+                        snapshot_data = json.loads(snapshot_data_raw)
+                    elif re.search(r'\.ya?ml', actual_snapshot_file.lower()):
+                        snapshot_data = yaml.load(snapshot_data_raw, Loader=yaml.SafeLoader)
+                    else:
+                        raise UnsupportedSnapshotFileFormatError(actual_snapshot_file)
+
+                    snapshot = AppSnapshot(**snapshot_data)
+                    try:
+                        restore_from_snapshot(snapshot, session=session)
+                        loaded_snapshot_count += 1
+                        loading_progress = loaded_snapshot_count * 100.0 / total_loaded_snapshot_count
+                        log.debug(f"Restoring with the snapshot files... [{'COMPLETE' if loading_progress == 100 else f'{loading_progress}%'}]")
+                    except Exception as e:
+                        log.error("Restoring with the snapshot files... [ERROR]")
+                        session.roll_back()
+                        raise RuntimeError(f'Failed to restore from a snapshot file {actual_snapshot_file}') from e
+            else:
+                log.error("Restoring with the snapshot files... [ERROR]")
+                session.roll_back()
+                raise MissingSnapshotFileError(actual_snapshot_file)
+
+    if snapshots:
+        loaded_snapshot_count: int = 0
+        total_loaded_snapshot_count: int = len(snapshots)
+
+        log.debug(f"Restoring with the snapshot objects... [STARTING]")
+        for snapshot in snapshots:
+            try:
+                restore_from_snapshot(snapshot, session=session)
+                loaded_snapshot_count += 1
+                loading_progress = loaded_snapshot_count * 100.0 / total_loaded_snapshot_count
+                log.debug(f"Restoring with the snapshot objects... [{'COMPLETE' if loading_progress == 100 else f'{loading_progress}%'}]")
+            except Exception as e:
+                log.error("Restoring with the snapshot objects... [ERROR]")
+                session.roll_back()
+                raise RuntimeError(f'Failed to restore from a snapshot object ({snapshot})') from e
+
     session.commit()
     session.close()
+
+
+if BOOTING_OPTIONS:
+    if 'bootstrap' not in BOOTING_OPTIONS:
+        raise RuntimeError(f'The "bootstrap" option is not given.')
+
+    raw_snapshot_files = optional_env('MINI_IDP_DEV_BOOTSTRAP_WITH_SNAPSHOTS', default='').strip()
+
+    bootstrap(
+        clear_operational_data='bootstrap:data-reset' in BOOTING_OPTIONS,
+        clear_session_data='bootstrap:session-reset' in BOOTING_OPTIONS,
+        snapshot_files=re.split(r'\s*,\s*', raw_snapshot_files) if raw_snapshot_files else [],
+    )
 
 __all__ = ["export_snapshot", "restore_from_snapshot"]

@@ -1,30 +1,45 @@
 import styles from './VElements.module.css';
 import Icon from "./Icon";
-import {MouseEventHandler, useCallback, useMemo, useState} from "react";
+import {useCallback, useMemo} from "react";
 import classNames from "classnames";
 
 type VCheckboxProps = {
     checked: boolean | "indeterminate";
     value?: any;
     style?: React.CSSProperties;
+    disabled?: boolean;
     onClick: (value: any, checked: boolean) => void;
     onKeyUp: (value: any, checked: boolean) => void;
 }
 
-export const VCheckbox = ({checked, value, style, onClick, onKeyUp}: VCheckboxProps) => {
-    const [inFlight, setInFlight] = useState(false);
-
+export const VCheckbox = ({checked, value, disabled, style, onClick, onKeyUp}: VCheckboxProps) => {
+    const interactable = useMemo(() => !disabled, [disabled]);
+    const iconName = useMemo(
+        () => checked === "indeterminate"
+            ? "indeterminate_check_box"
+            : (checked ? "check_box" : "check_box_outline_blank"),
+        [checked]
+    );
+    const checkingStyleClass = useMemo(
+        () => checked === "indeterminate"
+            ? styles.vCheckboxIntermediate
+            : (checked ? styles.vCheckboxYes : styles.vCheckboxNo),
+        [checked]
+    );
     const cssClasses = useMemo(
-        () => [styles.vCheckbox, inFlight ? styles.vCheckboxInFlight : null]
+        () => [
+            styles.vCheckbox,
+            checkingStyleClass,
+            (interactable) ? null : styles.vCheckboxDisabled,
+        ]
             .filter(c => c !== null),
-        [inFlight]
+        [interactable, checkingStyleClass]
     );
 
     // @ts-ignore
     const toggleWithClick = useCallback((e) => {
         e.preventDefault();
         e.stopPropagation();
-        setInFlight(true);
         const nextChecked = checked === "indeterminate" ? true : !checked;
         onClick(value, nextChecked);
     }, [onClick, value, checked]);
@@ -34,31 +49,29 @@ export const VCheckbox = ({checked, value, style, onClick, onKeyUp}: VCheckboxPr
         e.preventDefault();
         e.stopPropagation();
         if (e.keyCode === 32) {
-            setInFlight(true);
             const nextChecked = checked === "indeterminate" ? true : !checked;
             onKeyUp(value, nextChecked);
         }
     }, [onKeyUp, value, checked])
 
-    return (
-        <a href={"#"}
-           className={classNames(cssClasses)}
-           style={style}
-           onClick={toggleWithClick}
-           onKeyUp={toggleWithKeyboard}>
-            <Icon
-                name={
-                    checked === true
-                        ? "check_box"
-                        : (
-                            checked === "indeterminate"
-                                ? "indeterminate_check_box"
-                                : "check_box_outline_blank"
-                        )
-                }
-            />
-        </a>
-    );
+    if (interactable) {
+        return (
+            <a href={"#"}
+               className={classNames(cssClasses)}
+               style={style}
+               onClick={toggleWithClick}
+               onKeyUp={toggleWithKeyboard}>
+                <Icon name={iconName}/>
+            </a>
+        );
+    } else {
+        return (
+            <span className={classNames(cssClasses)}
+                  style={style}>
+                <Icon name={iconName}/>
+            </span>
+        );
+    }
 }
 
 type VSwitchProps = {

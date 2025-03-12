@@ -30,4 +30,7 @@
     --colourTriadicGreen: #66DE1B;
     --colourComplementaryOrange: #DE531B;
     --colourComplementaryYellow: #DED51B;
+
+    --colourDanger: var(--colourTriadicRed);
+    --colourWarning: var(--colourComplementaryYellow);
 }

@@ -67,6 +67,7 @@ def get_basic_template_variables(request: Request) -> Dict[str, Any]:
 async def restore_session(request: Request) -> Session:
     session_manager: SessionManager = container.get(SessionManager)
     session: Session = await asyncio.to_thread(session_manager.load, encrypted_id=request.cookies.get('sid'))
+
     return session
 
 

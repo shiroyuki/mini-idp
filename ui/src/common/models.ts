@@ -10,19 +10,11 @@ export interface IAMScope {
     fixed?: boolean | null;
 }
 
-export interface PredefinedScope {
-    OPENID: IAMScope;
-    PROFILE: IAMScope;
-    EMAIL: IAMScope;
-    OFFLINE_ACCESS: IAMScope;
-    SYS_ADMIN: IAMScope;
-    IMPERSONATION: IAMScope;
-}
-
 export interface IAMRole {
     id?: string | null;
     name: string;
     description?: string | null;
+    fixed?: boolean | null;
 }
 
 export interface IAMUser {
@@ -76,4 +68,5 @@ export interface IAMPolicy {
     resource: string;
     subjects: IAMPolicySubject[];
     scopes: string[];
+    fixed?: boolean | null;
 }

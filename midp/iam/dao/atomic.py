@@ -1,6 +1,6 @@
 import json
 from dataclasses import is_dataclass, asdict
-from typing import Generic, TypeVar, Any, Dict, Optional, Generator, Callable, List, Type, Union
+from typing import Generic, TypeVar, Any, Dict, Optional, Generator, Callable, List, Type, Union, Tuple, Iterable
 
 from pydantic import BaseModel
 
@@ -136,13 +136,32 @@ class AtomicDao(Generic[T]):
 
     def select(self,
                where: Optional[str] = None,
-               parameters: Optional[Dict[str, Any]] = None,
+               parameters: Union[None, Dict[str, Any]] = None,
+               order_by: Optional[List[Iterable[str]]] = None,
                limit: Optional[int] = None,
                datastore_session: Optional[DataStoreSession] = None) -> Generator[T, None, None]:
         query = f'SELECT * FROM {self._table_name}'
 
         if where:
             query = f'{query} WHERE {where}'
+
+        if order_by:
+            actual_order_list: List[Tuple[str, str]] = []
+
+            for order in order_by:
+                if len(order) > 1:
+                    field, direction = order[:2]
+                elif len(order) == 1:
+                    field = order[0]
+                    direction = 'ASC'
+                else:
+                    raise RuntimeError(f'The order-by parameter is invalid. (given = {order_by})')
+
+                actual_order_list.append((field, direction))
+
+            actual_order_by = ', '.join([f'{field} {direction}' for field, direction in actual_order_list])
+
+            query = f'{query} ORDER BY {actual_order_by}'
 
         if limit:
             query = f'{query} LIMIT {limit}'
@@ -214,6 +233,7 @@ class AtomicDao(Generic[T]):
         insert_query = f"""
             INSERT INTO {self._table_name} ({', '.join(sql_column_names)})
             VALUES ({', '.join(sql_column_value_placeholders)}) 
+            ON CONFLICT DO NOTHING 
         """
 
         self._log.debug(f'RUN: {insert_query} (params={sql_params})')
@@ -259,12 +279,14 @@ class AtomicDao(Generic[T]):
                 WHERE {where}
         """
 
-        self._log.debug(f'RUN: {update_query} (params={sql_params})')
-
         if datastore_session:
-            if datastore_session.execute_without_result(update_query, sql_params) == 0:
-                raise UpdateError(obj)
-        elif self._datastore.execute_without_result(update_query, sql_params) == 0:
-            raise UpdateError(obj)
+            update_count = datastore_session.execute_without_result(update_query, sql_params)
+        else:
+            update_count = self._datastore.execute_without_result(update_query, sql_params)
+
+        if update_count == 0:
+            self._log.info(f'{type(obj).__name__}/{obj.id}: Not updated (where: {where}; params: {sql_params})')
+        elif update_count > 1:
+            self._log.warning(f'{type(obj).__name__}/{obj.id}: Unexpected multiple updates (where: {where}; params: {sql_params})')
 
         return obj

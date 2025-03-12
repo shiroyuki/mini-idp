@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Form, Depends, Query
 from imagination import container
+from pydantic import BaseModel
 from sqlalchemy.sql.functions import session_user
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
@@ -20,7 +21,7 @@ from midp.common.web_helpers import restore_session
 from midp.iam.models import PredefinedScope, IAMPolicySubject
 from midp.log_factory import get_logger_for
 from midp.models import GrantType
-from midp.oauth.access_evaluator import AccessEvaluator
+from midp.oauth.access_evaluator import ClientAuthenticator, ClientAuthenticationError
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
     DeviceAuthorizationRequest, DeviceAuthorizationResponse, LoginResponse
 from midp.oauth.user_authenticator import UserAuthenticator, AuthenticationResult, AuthenticationError
@@ -48,7 +49,7 @@ async def sign_in(request: Request,
                   session: Annotated[Session, Depends(restore_session)]) -> LoginResponse:
     # TODO Prevent the brute-force/DOS attack with implementing the rate limit.
     if request.headers.get("accept") == 'application/json':
-        session_user = None # session.data.get('user')
+        session_user = None  # session.data.get('user')
 
         response_body = LoginResponse(already_exists=session_user is not None)
 
@@ -70,7 +71,7 @@ async def sign_in(request: Request,
                 response_body.principle = result.principle
                 response_body.access_token = result.access_token
                 response_body.refresh_token = result.refresh_token
-            except AuthenticationError as e:
+            except ClientAuthenticationError as e:
                 response.status_code = 400
                 response_body.error = e.code
                 response_body.error_description = e.description
@@ -82,13 +83,17 @@ async def sign_in(request: Request,
 
 @oauth_router.get(r'/logout')
 async def sign_out(session: Annotated[Session, Depends(restore_session)]):
+    response = Response(status_code=200)
+
     if 'user' in session.data:
         del session.data['user']
         session.save()
 
+        response.delete_cookie('sid')
+
         # TODO Deactivate the access and refresh tokens.
 
-    return None
+    return response
 
 
 @oauth_router.get(r'/me/token')
@@ -100,7 +105,6 @@ async def check_token(response: Response, session: Annotated[Session, Depends(re
     else:
         response.status_code = 401
         return None
-
 
 
 @oauth_router.get(r'/me/session')
@@ -123,7 +127,7 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
                                         response: Response,
                                         resource: Optional[str] = None,
                                         ):
-    access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
+    access_evaluator: ClientAuthenticator = container.get(ClientAuthenticator)
 
     oauth_base_url = urljoin(str(request.base_url), 'oauth')
     resource_url = resource
@@ -138,10 +142,11 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
         response.status_code = 400
         return DeviceVerificationCodeResponse(error='invalid_scope')
 
-    error_code = await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
-    if error_code:
+    try:
+        await access_evaluator.authenticate(client_id=client_id, grant_type=GrantType.DEVICE_CODE)
+    except ClientAuthenticationError as e:
         response.status_code = 400
-        return DeviceVerificationCodeResponse(error=error_code)
+        return DeviceVerificationCodeResponse(error=e.reason)
 
     device_code = str(uuid4())
     hasher = hashlib.new('sha1')
@@ -187,28 +192,73 @@ async def initiate_device_authorization(client_id: Annotated[str, Form()],
     )
 
 
+class TokenExchangeRequest(BaseModel):
+    client_id: str
+    client_secret: Optional[str] = None
+    grant_type: str
+    device_code: Optional[str] = None
+    audience: Optional[str] = None  # non-standard
+    resource: Optional[str] = None  # non-standard
+    scope: str = None
+
+
 @oauth_router.post(r'/token')
-async def exchange_token(client_id: Annotated[str, Form()],
-                         grant_type: Annotated[str, Form()],
-                         device_code: Annotated[str, Form()],
+async def exchange_token(data: Annotated[TokenExchangeRequest, Form()],
                          request: Request,
                          response: Response) -> TokenExchangeResponse:
-    access_evaluator: AccessEvaluator = container.get(AccessEvaluator)
+    # Based on https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow
+
+    log = get_logger_for('/oauth/token')
+
+    access_evaluator: ClientAuthenticator = container.get(ClientAuthenticator)
     token_manager: TokenManager = container.get(TokenManager)
 
-    if grant_type == GrantType.DEVICE_CODE:
-        await access_evaluator.check_if_client_is_allowed(client_id, GrantType.DEVICE_CODE)
+    # Authenticate the client.
+    try:
+        client = await access_evaluator.authenticate(
+            client_id=data.client_id,
+            client_secret=data.client_secret,
+            grant_type=data.grant_type,
+        )
+    except ClientAuthenticationError as e:
+        log.warning(f"Detected token exchange attempt with Client/{data.client_id} (REJECTED: {e.reason})")
+        response.status_code = 401
+        return TokenExchangeResponse(error=e.reason)
 
+    if data.grant_type == GrantType.CLIENT_CREDENTIALS:
+        ######################################
+        # Handle the client credentials flow #
+        ######################################
+        resource_url = data.resource or data.audience
+        iam_policy_subject = IAMPolicySubject(subject=client.name, kind="client")
+
+        try:
+            token_set: TokenSet = token_manager.create_token_set(
+                subject=iam_policy_subject,
+                resource_url=resource_url,
+                requested_scopes=re.split(r'\s+', data.scope) if data.scope else [],
+            )
+            return TokenExchangeResponse(access_token=token_set.access_token,
+                                         expires_in=floor(token_set.access_claims['exp'] - time()),
+                                         refresh_token=token_set.refresh_token)
+        except TokenGenerationError as e:
+            response.status_code = 401
+            return TokenExchangeResponse(error=e.args[0])
+    elif data.grant_type == GrantType.DEVICE_CODE:
+        ###############################
+        # Handle the device code flow #
+        ###############################
         key_storage: KeyStorage = container.get(KeyStorage)
-        verification_state = await key_storage.async_get(f'device-code:{device_code}/state')
+        verification_state = await key_storage.async_get(f'device-code:{data.device_code}/state')
 
         if verification_state == 'ok':
-            verified_info = await key_storage.async_get(f'device-code:{device_code}/info')
+            verified_info = await key_storage.async_get(f'device-code:{data.device_code}/info')
             resource_url = verified_info['resource_url']
             subject: str = verified_info['sub']
             requested_scopes = verified_info['scopes']
 
             if subject.startswith(SERVICE_TO_SERVICE_URI_PREFIX):
+                # FIXME This part does not seem to be used anywhere. REMOVE this.
                 iam_policy_subject = IAMPolicySubject(subject=subject[len(SERVICE_TO_SERVICE_URI_PREFIX):],
                                                       kind='service')
             else:
@@ -224,6 +274,7 @@ async def exchange_token(client_id: Annotated[str, Form()],
                                              expires_in=floor(token_set.access_claims['exp'] - time()),
                                              refresh_token=token_set.refresh_token)
             except TokenGenerationError as e:
+                response.status_code = 401
                 return TokenExchangeResponse(error=e.args[0])
         else:
             response.status_code = 400

@@ -13,19 +13,6 @@ type NavigationItem = {
     path: string;
     exactMatch?: boolean;
 }
-
-const LinkTo = (label: string, path: string, exactMatch?: boolean) => {
-    const location = useLocation();
-    const requestPath = location.pathname;
-    const cssClasses: string[] = [];
-
-    if ((exactMatch && requestPath === path) || (!exactMatch && requestPath.startsWith(path))) {
-        cssClasses.push(styles.active);
-    }
-
-    return <Link to={path} className={classNames(cssClasses)}>{label}</Link>
-}
-
 const NavigationItem = (nav: NavigationItem) => {
     const location = useLocation();
     const requestPath = location.pathname;

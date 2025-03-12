@@ -6,32 +6,93 @@ import reportWebVitals from './reportWebVitals';
 import {createHashRouter, RouterProvider} from 'react-router-dom';
 import LoginComponent from "./components/LoginComponent";
 import UIFoundation from "./components/UIFoundation";
-import {ResourceManagerPage} from "./pages/ResourceManagerPage";
-import {IAM_USER_SCHEMA} from "./common/resource-schema";
+import {PerResourcePermission, PerResourcePermissionFetcher, ResourceManagerPage} from "./pages/ResourceManagerPage";
+import {IAM_ROLE_SCHEMA, IAM_SCOPE_SCHEMA, IAM_USER_SCHEMA} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
 import {MyProfilePage} from "./pages/SettingsPage";
-import {GenericModel, IAMUser} from "./common/models";
+import {GenericModel, IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
 import {storage} from "./common/storage";
 
-const userManagerPage = (
-    <ResourceManagerPage
+const getPermissionPerPolicy: PerResourcePermissionFetcher = (item: GenericModel) => {
+    // TODO Check if the roles also permit.
+    return !((item as IAMPolicy).fixed || false)
+        ? ["read", "write", "delete"]
+        : [];
+}
+const getPermissionPerRole: PerResourcePermissionFetcher = (item: GenericModel) => {
+    // TODO Check if the roles also permit.
+    return !((item as IAMRole).fixed || false)
+        ? ["read", "write", "delete"]
+        : [];
+}
+const getPermissionPerScope: PerResourcePermissionFetcher = (item: GenericModel) => {
+    // TODO Check if the roles also permit.
+    return !((item as IAMScope).fixed || false)
+        ? ["read", "write", "delete"]
+        : [];
+}
+const getPermissionPerUser: PerResourcePermissionFetcher = (item: GenericModel) => {
+    const user = item as IAMUser;
+    const accessToken = storage.get("access_token");
+    const encodedClaims = accessToken.split(".")[1];
+    const claims = JSON.parse(atob(encodedClaims)) as {sub: string};
+
+    const currentUserId = claims.sub;
+
+    const permissions: PerResourcePermission[] = ["read"];
+
+    if (true /* TODO replace with the role check */) {
+        permissions.push("write");
+    }
+
+    if (currentUserId !== user.id /* TODO or the roles permit */) {
+        permissions.push("delete");
+    }
+
+    return permissions;
+}
+
+function makeUserManagerPage() {
+    return <ResourceManagerPage
         baseBackendUri={"/rest/users"}
         baseFrontendUri={"/users"}
         schema={IAM_USER_SCHEMA}
         listPage={
             {
                 title: "Users",
-                assertResourceIsReadOnly: (item: GenericModel) => {
-                    const user = item as IAMUser;
-                    const accessToken = storage.get("access_token");
-                    const encodedClaims = accessToken.split(".")[1];
-                    const claims = JSON.parse(atob(encodedClaims)) as {sub: string};
-                    return claims.sub === item.id;
-                }
             }
         }
-    />
-);
+        getPermissions={getPermissionPerUser}
+    />;
+}
+
+function makeRoleManagerPage() {
+    return <ResourceManagerPage
+        baseBackendUri={"/rest/roles"}
+        baseFrontendUri={"/roles"}
+        schema={IAM_ROLE_SCHEMA}
+        listPage={
+            {
+                title: "Roles",
+            }
+        }
+        getPermissions={getPermissionPerRole}
+    />;
+}
+
+function makeScopeManagerPage() {
+    return <ResourceManagerPage
+        baseBackendUri={"/rest/scopes"}
+        baseFrontendUri={"/scopes"}
+        schema={IAM_SCOPE_SCHEMA}
+        listPage={
+            {
+                title: "Scopes",
+            }
+        }
+        getPermissions={getPermissionPerScope}
+    />;
+}
 
 const router = createHashRouter([
     {
@@ -54,11 +115,34 @@ const router = createHashRouter([
             {
                 path: 'users',
                 // @ts-ignore
-                element: userManagerPage,
+                element: makeUserManagerPage(),
                 children: [
                     {
                         path: ":id",
-                        element: userManagerPage
+                        element: makeUserManagerPage(),
+
+                    }
+                ]
+            },
+            {
+                path: 'roles',
+                // @ts-ignore
+                element: makeRoleManagerPage(),
+                children: [
+                    {
+                        path: ":id",
+                        element: makeRoleManagerPage(),
+                    }
+                ]
+            },
+            {
+                path: 'scopes',
+                // @ts-ignore
+                element: makeScopeManagerPage(),
+                children: [
+                    {
+                        path: ":id",
+                        element: makeScopeManagerPage(),
                     }
                 ]
             },

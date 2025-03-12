@@ -73,6 +73,11 @@ class DataStoreSession:
         self.__c.commit()
         self.__log.debug("Committed")
 
+    def roll_back(self):
+        self.__log.info("Rollback in progress")
+        self.__c.rollback()
+        self.__log.warning("Rollback complete")
+
     def close(self):
         if not self.__c.closed:
             self.__c.close()

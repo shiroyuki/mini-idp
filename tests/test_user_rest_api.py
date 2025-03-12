@@ -1,10 +1,13 @@
 from midp.app.web_client import ClientError
-from midp.common.obj_patcher import SimpleJsonPatchOperation
+from midp.common.obj_patcher import PatchOperation
 from midp.iam.models import IAMUser
 from tests.common.base_feature import GenericAppFeature
 
 
 class E2ETest(GenericAppFeature):
+    def setUp(self):
+        self._authenticate_with_client_credentials()
+
     def test_get_unknown_user(self):
         try:
             self._client.users.get("faux_user")
@@ -12,8 +15,6 @@ class E2ETest(GenericAppFeature):
             self.assertEqual(404, e.response_status)
 
     def test_manage_new_user_as_admin(self):
-        self._initiate_client_with_device_code_flow()
-
         test_user = self._client.users.create(IAMUser(
             name="test_user",
             password="nosecret",
@@ -26,12 +27,12 @@ class E2ETest(GenericAppFeature):
         self.assertEqual('test_user', test_user.name)
         self.assertEqual('Test User', test_user.full_name)
         self.assertEqual('test_user@localhost', test_user.email)
-        self.assertEqual('nosecret', test_user.password)
+        self.assertIsNone(test_user.password, 'The password is set to NULL to protect the sensitive data.')
 
         self._client.users.patch(
             test_user.id,
             [
-                SimpleJsonPatchOperation(op="replace", path="/full_name", value="Test User Modified"),
+                PatchOperation(op="replace", path="/full_name", value="Test User Modified"),
             ],
         )
 
@@ -41,7 +42,7 @@ class E2ETest(GenericAppFeature):
         self._client.users.patch(
             test_user.id,
             [
-                SimpleJsonPatchOperation(op="replace", path="/password", value="Foo Bar"),
+                PatchOperation(op="replace", path="/password", value="Foo Bar"),
             ],
         )
 
@@ -54,6 +55,31 @@ class E2ETest(GenericAppFeature):
             self._client.users.get(test_user.id)
         except ClientError as e:
             self.assertEqual(404, e.response_status)
+
+    def test_access_sensitive_data(self):
+        test_user = self._client.users.create(IAMUser(
+            name="test_user",
+            password="nosecret",
+            email="test_user@localhost",
+            full_name="Test User",
+        ))
+        self.defer(lambda: self._client.users.delete('test_user'))
+
+        test_user = self._client.users.get(test_user.id, view_secret=False)
+
+        self.assertIsNotNone(test_user.id)
+        self.assertEqual('test_user', test_user.name)
+        self.assertEqual('Test User', test_user.full_name)
+        self.assertEqual('test_user@localhost', test_user.email)
+        self.assertNotEqual('nosecret', test_user.password)
+
+        test_user = self._client.users.get(test_user.id, view_secret=True)
+
+        self.assertIsNotNone(test_user.id)
+        self.assertEqual('test_user', test_user.name)
+        self.assertEqual('Test User', test_user.full_name)
+        self.assertEqual('test_user@localhost', test_user.email)
+        self.assertEqual('nosecret', test_user.password)
 
     def test_modify_existing_user_as_admin(self):
         self._initiate_client_with_device_code_flow()
@@ -69,7 +95,7 @@ class E2ETest(GenericAppFeature):
         self._client.users.patch(
             user_a.name,
             [
-                SimpleJsonPatchOperation(op="replace", path="/full_name", value="Alpha Alternative"),
+                PatchOperation(op="replace", path="/full_name", value="Alpha Alternative"),
             ],
         )
 

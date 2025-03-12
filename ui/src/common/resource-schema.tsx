@@ -1,10 +1,9 @@
 import {http, HttpError} from "./http-client";
 import {IAMRole} from "./models";
 import {CSSProperties} from "react";
-import classNames from "classnames";
 import {ejectToLoginScreen} from "./helpers";
 
-type dataType = "string" | "integer" | "float" | "boolean" | "object";
+type JsonSchemaDataType = "string" | "number" | "integer" | "float" | "boolean" | "object";
 
 export type ListTransformedOption = {
     checked: boolean;
@@ -18,7 +17,6 @@ export type ListRenderingOptions = {
     maxSelections?: number; // default: -1 (no limit)
     minSelections?: number; // default: 0 (optional) or 1 (required)
     compare?: (a: any, b: any) => -1 | 0 | 1;
-    transformForReading: (item: ListTransformedOption) => any;
     transformForEditing: (fieldDataList: any[], loadedListItem: any) => ListTransformedOption;
 };
 
@@ -28,13 +26,14 @@ export type ListRenderingOptions = {
 export type ResourceSchema = {
     ///// Standard JSON Schema /////
     title?: string;
-    type?: dataType;
+    type?: JsonSchemaDataType;
     required?: boolean;
     items?: ResourceSchema;
     ///// Custom properties /////
     label?: string;
     readOnly?: boolean;
     hidden?: boolean;
+    default?: any;
     /**
      * The capability for auto-generation
      *
@@ -59,11 +58,68 @@ export type ResourceSchema = {
     render?: (schema: ResourceSchema, data: any) => any;
 };
 
+export const IAM_ROLE_SCHEMA: ResourceSchema[] = [
+    {
+        title: "id",
+        label: "ID",
+        type: "string",
+        required: false,
+        isPrimaryKey: true,
+        autoGenerationCapability: "full:post",
+        readOnly: true,
+        hidden: true,
+    },
+    {
+        title: "name",
+        label: "Name",
+        type: "string",
+        required: true,
+        isReferenceKey: true,
+    },
+    {
+        title: "description",
+        label: "Description",
+        type: "string",
+        required: false,
+    },
+];
+
+export const IAM_SCOPE_SCHEMA: ResourceSchema[] = [
+    {
+        title: "id",
+        label: "ID",
+        type: "string",
+        required: false,
+        isPrimaryKey: true,
+        autoGenerationCapability: "full:post",
+        readOnly: true,
+        hidden: true,
+    },
+    {
+        title: "name",
+        label: "Name",
+        type: "string",
+        required: true,
+        isReferenceKey: true,
+    },
+    {
+        title: "description",
+        label: "Description",
+        type: "string",
+    },
+    {
+        title: "sensitive",
+        label: "Sensitive",
+        type: "boolean",
+    },
+];
+
 export const IAM_USER_SCHEMA: ResourceSchema[] = [
     {
         title: "id",
         label: "ID",
-        required: true,
+        type: "string",
+        required: false,
         isPrimaryKey: true,
         autoGenerationCapability: "full:post",
         readOnly: true,
@@ -75,22 +131,26 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
     {
         title: "name",
         label: "Username",
+        type: "string",
         required: true,
         isReferenceKey: true,
     },
     {
         title: "email",
         label: "E-mail Address",
+        type: "string",
         required: true,
     },
     {
         title: "full_name",
         label: "Full Name",
+        type: "string",
         required: true,
     },
     {
         title: "password",
         label: "Password",
+        type: "string",
         required: true,
         sensitive: true,
         hidden: true,
@@ -121,19 +181,13 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
                     }
                 );
             },
-            transformForReading: (item: ListTransformedOption) => {
-                return (
-                    <span key={item.value}
-                          className={classNames(["foundation-tag", item.checked ? "selected" : "not-selected"])}>{item.label}</span>
-                );
-            },
             transformForEditing: (fieldDataList: any[], loadedListItem: any) => {
                 const typedItem = loadedListItem as IAMRole;
                 const assignedRoles = fieldDataList || [];
                 const checked = assignedRoles.includes(typedItem.name as string);
                 return {
                     checked: checked,
-                    label: typedItem.description ? `${typedItem.name} - ${typedItem.description}` : typedItem.name,
+                    label: typedItem.description ? typedItem.description : typedItem.name,
                     value: typedItem.name as string,
                 };
             }

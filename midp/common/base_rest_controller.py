@@ -39,13 +39,16 @@ class BaseRestController(Generic[T]):
         self._token_manager: TokenManager = container.get(TokenManager)
 
     def _respond_with_error(self, status: int, error: str, error_description: Optional[str] = None):
-        return Response(
+        self._log.warning("Responding with HTTP %d for: %s", status, error)
+        response = Response(
             status_code=status,
             content=FailedResponse(
                 error=error,
                 error_description=error_description
             ).model_dump_json(indent=2)
         )
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
     def _get_scopes_namespace(self) -> str:
         raise NotImplementedError()
@@ -64,7 +67,7 @@ class BaseRestController(Generic[T]):
 
     def _extract_scopes(self, access_claims: Dict[str, Any]) -> List[str]:
         raw_scopes = access_claims.get('scope')
-        return re.split(r'\s*,\s*', raw_scopes) if raw_scopes else []
+        return re.split(r'\s+', raw_scopes) if raw_scopes else []
 
     def _check_authorization(self, action: DataAction, access_claims: Dict[str, Any]) -> bool:
         given_scopes: List[str] = self._extract_scopes(access_claims)
@@ -87,10 +90,7 @@ class BaseRestController(Generic[T]):
         else:
             raise NotImplementedError('Unsupported action')
 
-        if len(matched_scopes) == len(given_scopes):
-            return True
-        else:
-            return False
+        return len(matched_scopes) == len(given_scopes)
 
     def list(self,
              request: Request,

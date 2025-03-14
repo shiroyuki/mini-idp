@@ -1,5 +1,5 @@
 import UIFoundation from "../components/UIFoundation";
-import {FC, ReactElement, useCallback, useEffect, useMemo, useState} from "react";
+import {FC, ReactElement, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Navigation, UIFoundationHeader} from "../components/UIFoundationHeader";
 import {ClientOptions, http} from "../common/http-client";
 import classNames from "classnames";
@@ -131,6 +131,7 @@ export const SoloResource = ({
 
     const loadResource = useCallback(() => {
         setInFlight(true);
+        setResource(undefined);
 
         http.sendAndMapAs<any>(
             "get",
@@ -281,7 +282,9 @@ const ResourceList = ({
         [selectionList, primaryKeyList]
     );
 
-    const loadResources = useCallback(() => {
+    const loadCache = useCallback(() => {
+        setCacheMap({});
+
         for (const rawField of schema) {
             const field = rawField as ResourceSchema;
             if (field.items && field.listRendering) {
@@ -300,21 +303,26 @@ const ResourceList = ({
                     })
             }
         }
+    }, [schema])
 
+    const loadResources = useCallback(() => {
         setInFlight(prevState => prevState + 1);
 
         http.sendAndMapAs<any[]>(
             "get",
             `${baseBackendUri}/`,
             makeClientOptions()
-        )
-            .then((data) => {
-                setResourceList(data);
-                setInFlight(prevState => prevState - 1);
-            });
-    }, [schema, baseBackendUri]);
+        ).then((data) => {
+            setResourceList(data);
+            setInFlight(prevState => prevState - 1);
+        });
+
+        loadCache()
+    }, [baseBackendUri, loadCache]);
 
     useEffect(() => {
+        setResourceList([]);
+        setCacheMap({});
         loadResources();
     }, [schema, baseBackendUri]);
 
@@ -343,35 +351,39 @@ const ResourceList = ({
         [setSelectionList, resourceList, getPermissions]
     )
 
-    // @ts-ignore
-    const askUserForDeleteConfirmation = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDataTableControllerMode("deletion:init");
-    }
+    const askUserForDeleteConfirmation = useCallback(
+        // @ts-ignore
+        (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDataTableControllerMode("deletion:init");
+        },
+        [setDataTableControllerMode]
+    )
 
-    if (resourceList === undefined || cacheMap === undefined || inFlight > 0) {
-        return <LinearLoadingAnimation label={"Loading..."}/>;
-    }
+    const renderFieldValueAsList = useCallback((fieldKey: string, fieldData: any[], listRenderingOption: ListRenderingOptions) => {
+        if (cacheMap[fieldKey] === undefined) {
+            console.warn(`No cache map for ${fieldKey}`);
+            return <LinearLoadingAnimation/>;
+        } else {
+            return <ul>
+                {
+                    (cacheMap[fieldKey] as any[])
+                        .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
+                        .map(loadedItem => listRenderingOption.transformForEditing(fieldData, loadedItem) as ListTransformedOption)
+                        .filter(loadedItem => loadedItem.checked)
+                        .map(item => (
+                            <li key={item.value}
+                                className={classNames([item.checked ? "selected" : "not-selected"])}>
+                                {item.label}
+                            </li>
+                        ))
+                }
+            </ul>;
+        }
+    }, [cacheMap]);
 
-    const renderFieldValueAsList = (fieldKey: string, fieldData: any[], listRenderingOption: ListRenderingOptions) => {
-        return <ul>
-            {
-                (cacheMap[fieldKey] as any[])
-                    .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
-                    .map(loadedItem => listRenderingOption.transformForEditing(fieldData, loadedItem) as ListTransformedOption)
-                    .filter(loadedItem => loadedItem.checked)
-                    .map(item => (
-                        <li key={item.value}
-                            className={classNames([item.checked ? "selected" : "not-selected"])}>
-                            {item.label}
-                        </li>
-                    ))
-            }
-        </ul>
-    };
-
-    const renderFieldValueAsPrimitive = (field: ResourceSchema, fieldData: any) => {
+    const renderFieldValueAsPrimitive = useCallback((field: ResourceSchema, fieldData: any) => {
         let renderedValue: any;
 
         if (fieldData === undefined || fieldData === null) {
@@ -401,9 +413,9 @@ const ResourceList = ({
         } else {
             return renderedValue;
         }
-    }
+    }, [baseFrontendUri]);
 
-    const renderField = (field: ResourceSchema, resource: GenericModel) => {
+    const renderField = useCallback((field: ResourceSchema, resource: GenericModel) => {
         const fieldKey = field.title as string;
         const fieldData = resource[fieldKey];
         const listRenderingOption = field.items && field.listRendering;
@@ -417,9 +429,9 @@ const ResourceList = ({
                 }</td>
             </>
         );
-    };
+    }, [renderFieldValueAsList, renderFieldValueAsPrimitive]);
 
-    const renderResource = (resource: GenericModel) => {
+    const renderResource = useCallback((resource: GenericModel) => {
         const selectable = getPermissions(resource).includes("delete");
         return (
             <tr key={schema[0].title}>
@@ -444,11 +456,20 @@ const ResourceList = ({
                 }
             </tr>
         );
-    };
+    }, [getPermissions, schema, dataTableControllerMode, selectionCollection, toggleSelection, renderField]);
 
-    const writableResourceCount = resourceList
-        .filter(resource => getPermissions(resource).includes("delete"))
-        .length;
+    const writableResourceCount = useMemo(
+        () => resourceList === undefined
+            ? 0
+            : resourceList
+                .filter(resource => getPermissions(resource).includes("delete"))
+                .length,
+        [resourceList, getPermissions]
+    );
+
+    if (resourceList === undefined || cacheMap === undefined || inFlight > 0) {
+        return <LinearLoadingAnimation label={"Loading..."}/>;
+    }
 
     return (
         <div className={classNames(["data-table-container", styles.localDataTable])}>

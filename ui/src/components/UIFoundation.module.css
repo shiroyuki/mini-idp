@@ -45,6 +45,7 @@
 }
 
 .scaffoldBody {
+    overflow: auto;
     order: 2;
     height: 100vh;
     flex: 1;

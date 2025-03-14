@@ -13,7 +13,7 @@ export const LinearLoadingAnimation = ({label, size, style}: LinearLoadingAnimat
     return (
         <div className={classNames(styles.linearLoader, styles[actualSize])} style={style}>
             <div></div>
-            <div>{label ?? "Please wait."}</div>
+            {label && <div>{label}</div>}
         </div>
     );
 };

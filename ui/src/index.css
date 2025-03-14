@@ -204,27 +204,15 @@ form {
         border-spacing: 0;
         border-top: 1px solid var(--darkGrey);
 
-        th {
+        th, td {
             text-align: left;
             padding: 8px 12px;
-            border-bottom: 2px solid var(--darkGrey);
 
             &.data-table-row-selector {
                 border-right: 1px dashed var(--grey);
                 text-align: right;
                 padding: 4px 8px;
-            }
-        }
-
-        td {
-            text-align: left;
-            padding: 8px 12px;
-            border-bottom: 1px solid var(--grey);
-
-            &.data-table-row-selector {
-                border-right: 1px dashed var(--grey);
-                text-align: right;
-                padding: 4px 8px;
+                width: 24px;
 
                 &.non-selectable {
                     cursor: default;
@@ -234,6 +222,14 @@ form {
                     }
                 }
             }
+        }
+
+        th {
+            border-bottom: 2px solid var(--darkGrey);
+        }
+
+        td {
+            border-bottom: 1px solid var(--grey);
         }
 
         td:empty::before {

@@ -3,8 +3,8 @@ import React, {useCallback, useEffect, useMemo, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
 import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
-import {GenericModel} from "../common/models";
 import Icon from "./Icon";
+import {GenericModel} from "../common/definitions";
 
 type FieldInputProps = {
     schema: ResourceSchema;
@@ -76,7 +76,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 updatedData = updatedData
                     .filter(item => {
                         if (schema.listRendering?.compare) {
-                            return schema.listRendering?.compare(item, value) !== 0;
+                            return schema.listRendering.compare(item, value) !== 0;
                         } else {
                             return item !== value;
                         }
@@ -126,7 +126,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                         <ul className={classNames([listingClassNames])}>
                             {
                                 listData
-                                    .map(item => listRenderingOption.transformForEditing(data, item) as ListTransformedOption)
+                                    .map(item => listRenderingOption.normalize(data, item) as ListTransformedOption)
                                     .filter(item => {
                                         return (listRenderingOption.list === "selected-only" && item.checked)
                                             || (listRenderingOption.list === "all" && (!disabled || item.checked));

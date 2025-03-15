@@ -7,11 +7,11 @@ import {LinearLoadingAnimation} from "../components/loaders";
 import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {ResourceView, ResourceViewMode} from "../components/ResourceView";
-import {GenericModel} from "../common/models";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 import styles from "./ResourceManagerPage.module.css"
+import {GenericModel} from "../common/definitions";
 
 export type PerResourcePermission = "list" | "read" | "write" | "delete";
 export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
@@ -380,7 +380,7 @@ const ResourceList = ({
                 {
                     (cacheMap[fieldKey] as any[])
                         .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
-                        .map(loadedItem => listRenderingOption.transformForEditing(fieldData, loadedItem) as ListTransformedOption)
+                        .map(loadedItem => listRenderingOption.normalize(fieldData, loadedItem) as ListTransformedOption)
                         .filter(loadedItem => loadedItem.checked)
                         .map(item => (
                             <li key={item.value}

@@ -2,25 +2,100 @@ import {http, HttpError} from "./http-client";
 import {IAMRole, IAMScope} from "./models";
 import {CSSProperties} from "react";
 import {ejectToLoginScreen} from "./helpers";
+import {Comparator, DataLoader, GenericModel} from "./definitions";
 
 type JsonSchemaDataType = "string" | "number" | "integer" | "float" | "boolean" | "object";
 
-export type ListTransformedOption = {
+export type ListTransformedOption<T> = {
     checked: boolean;
     label?: string;
-    value: string;
+    value: T;
 };
 
-type LoadedItemToSelectionOptionTransformer = (selectedItems: any[], iteratingLoadedItem: any) => ListTransformedOption;
+export type ListItemNormalizer<LoadedItemType extends GenericModel, KeyType> = (selectedItems: KeyType[], iteratingLoadedItem: LoadedItemType) => ListTransformedOption<KeyType>;
 
 export type ListRenderingOptions = {
     list: "selected-only" | "all"; // default: all
-    load: () => Promise<any[]>;
+    load: DataLoader<any>;
     maxSelections?: number; // default: -1 (no limit)
     minSelections?: number; // default: 0 (optional) or 1 (required)
-    compare?: (a: any, b: any) => -1 | 0 | 1;
-    transformForEditing: LoadedItemToSelectionOptionTransformer;
+    compare?: Comparator<any>;
+    normalize: ListItemNormalizer<any, any>;
 };
+
+function listItemsFrom<T>(listUrl: string): DataLoader<T> {
+    return async () => {
+        return await http.sendAndMapAs<T[]>(
+            "get",
+            listUrl,
+            {
+                handleError: response => {
+                    if (response.status === 401) {
+                        ejectToLoginScreen();
+                    } else {
+                        response.text().then(content => {
+                            throw new HttpError(response.status, content)
+                        });
+                    }
+                }
+            }
+        );
+    }
+}
+
+function listFixedItems(fixtures: any[]) {
+    return () => new Promise<any[]>((resolve, _) => {resolve(fixtures)});
+}
+
+function normalizeItemWith<LoadedItemType extends GenericModel, KeyType>(valueField: string, labelField: string) {
+    return (selectedItems: KeyType[], iteratingLoadedItem: LoadedItemType) => {
+        const typedItem = iteratingLoadedItem as LoadedItemType;
+        const selections = selectedItems || [];
+        const value = typedItem[valueField] as KeyType;
+        const label = typedItem[labelField] ?? value;
+        const checked = selections.includes(value);
+
+        return {
+            checked: checked,
+            label: label,
+            value: value,
+        };
+    }
+}
+
+function normalizePrimitiveValue() {
+    return (selectedItems: any[], iteratingLoadedItem: any) => {
+        const selectionList = (selectedItems || []) as any[];
+        const iteratingId = iteratingLoadedItem as any;
+        const checked = selectionList.includes(iteratingId);
+
+        return {
+            checked: checked,
+            label: iteratingId,
+            value: iteratingId,
+        }
+    }
+}
+
+function compareItemsWith<T extends GenericModel>(valueField: string): Comparator<T> {
+    return (a: T, b: T) => {
+        if (a[valueField] === b[valueField]) {
+            return 0;
+        } else {
+            return a[valueField] < b[valueField] ? -1 : 1;
+        }
+    }
+}
+
+function comparePrimitiveValues() {
+    return (a: any, b: any) => {
+        if (a === b) {
+            return 0;
+        } else {
+            return a < b ? -1 : 1;
+        }
+    }
+}
 
 /**
  * JSON Schema (custom)
@@ -184,30 +259,9 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         },
         listRendering: {
             list: "all",
-            load: async () => {
-                return KNOWN_GRANT_TYPES;
-            },
-            compare(a: any, b: any) {
-                const s1 = a as LocalGrantType;
-                const s2 = b as LocalGrantType;
-
-                if (s1.id === s2.id) {
-                    return 0;
-                } else {
-                    return s1.id < s2.id ? -1 : 1;
-                }
-            },
-            transformForEditing: (selectedItems: any[], iteratingLoadedItem: any) => {
-                const selectionList = (selectedItems || []) as string[];
-                const typeItem = iteratingLoadedItem as LocalGrantType;
-                const checked = selectionList.includes(typeItem.id);
-
-                return {
-                    checked: checked,
-                    label: typeItem.description,
-                    value: typeItem.id,
-                }
-            }
+            load: listFixedItems(KNOWN_GRANT_TYPES),
+            compare: compareItemsWith("id"),
+            normalize: normalizeItemWith<LocalGrantType, string>("id", "description"),
         }
     },
     {
@@ -218,30 +272,9 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         },
         listRendering: {
             list: "all",
-            load: async () => {
-                return ["code"];
-            },
-            compare(a: any, b: any) {
-                const s1 = a as string;
-                const s2 = b as string;
-
-                if (s1 === s2) {
-                    return 0;
-                } else {
-                    return s1 < s2 ? -1 : 1;
-                }
-            },
-            transformForEditing: (selectedItems: any[], iteratingLoadedItem: any) => {
-                const selectionList = (selectedItems || []) as string[];
-                const iteratingId = iteratingLoadedItem as string;
-                const checked = selectionList.includes(iteratingId);
-
-                return {
-                    checked: checked,
-                    label: iteratingId,
-                    value: iteratingId,
-                }
-            }
+            load: listFixedItems(["code"]),
+            compare: comparePrimitiveValues(),
+            normalize: normalizePrimitiveValue(),
         }
     },
     {
@@ -252,35 +285,8 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         },
         listRendering: {
             list: "all",
-            load: async () => {
-                return await http.sendAndMapAs<IAMScope[]>(
-                    "get",
-                    "/rest/scopes/",
-                    {
-                        handleError: response => {
-                            if (response.status === 401) {
-                                ejectToLoginScreen();
-                            } else {
-                                response.text().then(content => {
-                                    throw new HttpError(response.status, content)
-                                });
-                            }
-                        }
-                    }
-                );
-            },
-            transformForEditing: (selectedItems: any[], iteratingLoadedItem: any) => {
-                const typedItem = iteratingLoadedItem as IAMScope;
-                const selections = selectedItems || [];
-                const checked = selections.includes(typedItem.name as string);
-
-                const label = typedItem.description ? typedItem.description : typedItem.name;
-                return {
-                    checked: checked,
-                    label: typedItem.fixed ? `${label} (fixed)` : label,
-                    value: typedItem.name as string,
-                };
-            }
+            load: listItemsFrom<IAMScope>("/rest/scopes/"),
+            normalize: normalizeItemWith<IAMScope, string>("name", "description"),
         }
     },
 ];
@@ -335,33 +341,8 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         },
         listRendering: {
             list: "all",
-            load: async () => {
-                return await http.sendAndMapAs<IAMRole[]>(
-                    "get",
-                    "/rest/roles/",
-                    {
-                        handleError: response => {
-                            if (response.status === 401) {
-                                ejectToLoginScreen();
-                            } else {
-                                response.text().then(content => {
-                                    throw new HttpError(response.status, content)
-                                });
-                            }
-                        }
-                    }
-                );
-            },
-            transformForEditing: (selectedItems: any[], iteratingLoadedItem: any) => {
-                const typedItem = iteratingLoadedItem as IAMRole;
-                const selections = selectedItems || [];
-                const checked = selections.includes(typedItem.name as string);
-                return {
-                    checked: checked,
-                    label: typedItem.description ? typedItem.description : typedItem.name,
-                    value: typedItem.name as string,
-                };
-            }
+            load: listItemsFrom<IAMRole>("/rest/roles/"),
+            normalize: normalizeItemWith<IAMRole, string>("name", "description"),
         }
     },
 ]

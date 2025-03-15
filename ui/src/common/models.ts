@@ -1,7 +1,3 @@
-export interface GenericModel {
-    [k: string]: any
-}
-
 export interface IAMScope {
     id?: string | null;
     name: string;

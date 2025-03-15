@@ -10,9 +10,10 @@ import {PerResourcePermission, PerResourcePermissionFetcher, ResourceManagerPage
 import {IAM_OAUTH_CLIENT_SCHEMA, IAM_ROLE_SCHEMA, IAM_SCOPE_SCHEMA, IAM_USER_SCHEMA} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
 import {MyProfilePage} from "./pages/MyProfilePage";
-import {GenericModel, IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
+import {IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
 import {storage} from "./common/storage";
 import {getAccessToken} from "./common/token";
+import {GenericModel} from "./common/definitions";
 
 const convertScopesToPermissions = (scopePrefix: string): PerResourcePermission[] => {
     const token = getAccessToken();

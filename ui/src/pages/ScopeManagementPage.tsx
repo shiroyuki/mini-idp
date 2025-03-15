@@ -1,7 +1,8 @@
 import {IAM_SCOPE_SCHEMA} from "../common/resource-schema";
-import {GenericModel, IAMScope} from "../common/models";
+import {IAMScope} from "../common/models";
 import {ResourceManagerPage} from "./ResourceManagerPage";
 import React from "react";
+import {GenericModel} from "../common/definitions";
 
 export const ScopeManagementPage = () => {
     return (

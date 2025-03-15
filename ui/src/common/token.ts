@@ -1,5 +1,6 @@
 import {storage} from "./storage";
-import {GenericModel} from "./models";
+
+import {GenericModel} from "./definitions";
 
 export interface JwtClaims extends GenericModel {
     sub: string;

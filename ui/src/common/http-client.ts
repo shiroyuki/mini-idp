@@ -79,10 +79,11 @@ export class HttpClient {
         } else {
             if (options?.handleError) {
                 options?.handleError(response);
+                throw new HttpError(response.status, '(omitted)');
+            } else {
+                const responseText = await response.text();
+                throw new HttpError(response.status, responseText || '(no response body)');
             }
-
-            const responseText = await response.text();
-            throw new HttpError(response.status, responseText || '(no response body)');
         }
     }
 }

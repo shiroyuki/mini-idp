@@ -7,45 +7,84 @@ import {createHashRouter, RouterProvider} from 'react-router-dom';
 import LoginComponent from "./components/LoginComponent";
 import UIFoundation from "./components/UIFoundation";
 import {PerResourcePermission, PerResourcePermissionFetcher, ResourceManagerPage} from "./pages/ResourceManagerPage";
-import {IAM_ROLE_SCHEMA, IAM_SCOPE_SCHEMA, IAM_USER_SCHEMA} from "./common/resource-schema";
+import {IAM_OAUTH_CLIENT_SCHEMA, IAM_ROLE_SCHEMA, IAM_SCOPE_SCHEMA, IAM_USER_SCHEMA} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
-import {MyProfilePage} from "./pages/SettingsPage";
+import {MyProfilePage} from "./pages/MyProfilePage";
 import {GenericModel, IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
 import {storage} from "./common/storage";
+import {getAccessToken} from "./common/token";
+
+const convertScopesToPermissions = (scopePrefix: string): PerResourcePermission[] => {
+    const token = getAccessToken();
+
+    if (token === null) {
+        return [];
+    }
+
+    const scopes = token.scopes;
+
+    if (scopes.includes("idp.root") || scopes.includes("idp.admin")) {
+        return ["delete", "list", "read", "write"];
+    }
+
+    return scopes
+        .filter(scope => scope.startsWith(scopePrefix + "."))
+        .map(scope => scope.substring(scopePrefix.length)) as PerResourcePermission[];
+}
+
+interface FixableResource extends GenericModel {
+    fixed?: boolean | null;
+}
+
+function getPermissionsForFixableResource<T extends FixableResource>(scopePrefix: string, item: T): PerResourcePermission[] {
+    const defaultPermissions = convertScopesToPermissions(scopePrefix);
+
+    if (defaultPermissions.length === 0) {
+        return [];
+    } else if ((item as T).fixed) {
+        return defaultPermissions.includes("read")
+            ? ["read"]
+            : [];
+    } else {
+        return defaultPermissions;
+    }
+}
 
 const getPermissionPerPolicy: PerResourcePermissionFetcher = (item: GenericModel) => {
-    // TODO Check if the roles also permit.
-    return !((item as IAMPolicy).fixed || false)
-        ? ["read", "write", "delete"]
-        : [];
-}
+    return getPermissionsForFixableResource('idp.policy', item as IAMPolicy);
+};
+
 const getPermissionPerRole: PerResourcePermissionFetcher = (item: GenericModel) => {
-    // TODO Check if the roles also permit.
-    return !((item as IAMRole).fixed || false)
-        ? ["read", "write", "delete"]
-        : [];
-}
+    return getPermissionsForFixableResource('idp.role', item as IAMRole);
+};
+
 const getPermissionPerScope: PerResourcePermissionFetcher = (item: GenericModel) => {
-    // TODO Check if the roles also permit.
-    return !((item as IAMScope).fixed || false)
-        ? ["read", "write", "delete"]
-        : [];
-}
+    return getPermissionsForFixableResource('idp.scope', item as IAMScope);
+};
+
+const getPermissionPerClient: PerResourcePermissionFetcher = (item: GenericModel) => {
+    return convertScopesToPermissions('idp.client');
+};
+
 const getPermissionPerUser: PerResourcePermissionFetcher = (item: GenericModel) => {
     const user = item as IAMUser;
-    const accessToken = storage.get("access_token");
-    const encodedClaims = accessToken.split(".")[1];
-    const claims = JSON.parse(atob(encodedClaims)) as {sub: string};
+    const token = getAccessToken();
 
+    if (token === null) {
+        return [];
+    }
+
+    const scopes = token.scopes;
+    const claims = token.claims;
     const currentUserId = claims.sub;
 
     const permissions: PerResourcePermission[] = ["read"];
 
-    if (true /* TODO replace with the role check */) {
+    if (scopes.includes("idp.root") || scopes.includes("idp.admin") || scopes.includes("idp.user.write")) {
         permissions.push("write");
     }
 
-    if (currentUserId !== user.id /* TODO or the roles permit */) {
+    if (![user.id, user.name].includes(currentUserId) /* TODO or the roles permit */) {
         permissions.push("delete");
     }
 
@@ -92,6 +131,20 @@ function makeScopeManagerPage() {
         }
         getPermissions={getPermissionPerScope}
     />;
+}
+
+function makeOAuthClientManagerPage() {
+    return <ResourceManagerPage
+        baseBackendUri={"/rest/clients"}
+        baseFrontendUri={"/clients"}
+        schema={IAM_OAUTH_CLIENT_SCHEMA}
+        listPage={
+            {
+                title: "OAuth Clients",
+            }
+        }
+        getPermissions={getPermissionPerClient}
+    />
 }
 
 const router = createHashRouter([
@@ -143,6 +196,17 @@ const router = createHashRouter([
                     {
                         path: ":id",
                         element: makeScopeManagerPage(),
+                    }
+                ]
+            },
+            {
+                path: 'clients',
+                // @ts-ignore
+                element: makeOAuthClientManagerPage(),
+                children: [
+                    {
+                        path: ":id",
+                        element: makeOAuthClientManagerPage(),
                     }
                 ]
             },

@@ -4,9 +4,8 @@ from typing import Optional
 from imagination.decorator.service import Service
 
 from midp.iam.dao.client import ClientDao
-from midp.iam.models import IAMOAuthClient
+from midp.iam.models import IAMOAuthClient, GrantType
 from midp.log_factory import get_logger_for_object
-from midp.models import GrantType
 
 
 class ClientAuthenticationError(RuntimeError):

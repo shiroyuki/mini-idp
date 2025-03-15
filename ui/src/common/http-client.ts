@@ -1,4 +1,5 @@
 import {storage} from "./storage";
+import {getAccessToken} from "./token";
 
 export type ClientOptions = {
     authRequired?: boolean;
@@ -40,9 +41,9 @@ export class HttpClient {
         };
 
         if (!noAuth) {
-            const accessToken = storage.get("access_token");
+            const accessToken = getAccessToken();
             if (accessToken !== null) {
-                headers['Authorization'] = `Bearer ${accessToken}`;
+                headers['Authorization'] = `Bearer ${accessToken.original}`;
             } else {
                 if (authRequired) {
                     throw new Error(`${method} ${url} requires the access token but it is UNAVAILABLE.`);

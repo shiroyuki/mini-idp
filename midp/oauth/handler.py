@@ -18,9 +18,8 @@ from midp.common.key_storage import KeyStorage, Entry
 from midp.common.session_manager import Session
 from midp.common.token_manager import TokenManager, TokenSet, TokenGenerationError
 from midp.common.web_helpers import restore_session
-from midp.iam.models import PredefinedScope, IAMPolicySubject
+from midp.iam.models import PredefinedScope, IAMPolicySubject, GrantType
 from midp.log_factory import get_logger_for
-from midp.models import GrantType
 from midp.oauth.access_evaluator import ClientAuthenticator, ClientAuthenticationError
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
     DeviceAuthorizationRequest, DeviceAuthorizationResponse, LoginResponse

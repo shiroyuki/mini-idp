@@ -26,29 +26,10 @@ export interface IAMUser {
     roles: string[];
 }
 
-export interface IAMUserReadOnly {
-    id: string;
-    name: string;
-    email: string;
-    full_name?: string | null;
-    roles: string[];
-}
-
 export interface IAMOAuthClient {
     id?: string | null;
     name: string;
     secret?: string | null;
-    audience: string;
-    grant_types: string[];
-    response_types: string[];
-    scopes: string[];
-    extras: Record<string, any>;
-    description?: string;
-}
-
-export interface IAMOAuthClientReadOnly {
-    id?: string | null;
-    name: string;
     audience: string;
     grant_types: string[];
     response_types: string[];

@@ -162,6 +162,30 @@ class IAMOAuthClient(BaseModel):
     description: Optional[str] = None
 
 
+class GrantType:
+    # The authorization flow
+    AUTHORIZATION = 'authorization'
+
+    # The client-credentials flow
+    CLIENT_CREDENTIALS = 'client_credentials'
+
+    # The device-code flow
+    DEVICE_CODE = 'urn:ietf:params:oauth:grant-type:device_code'
+
+    # The on-behalf-of flow
+    IMPERSONATION = 'urn:ietf:params:oauth:grant-type:jwt-bearer'
+
+
+KNOWN_GRANT_TYPES = [
+    GrantType.AUTHORIZATION,
+    GrantType.CLIENT_CREDENTIALS,
+    GrantType.DEVICE_CODE,
+    GrantType.IMPERSONATION,
+]
+
+KNOWN_RESPONSE_TYPES = ["code"]
+
+
 class IAMOAuthClientReadOnly(BaseModel):
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
     name: str

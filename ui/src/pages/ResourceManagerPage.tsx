@@ -13,7 +13,7 @@ import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 import styles from "./ResourceManagerPage.module.css"
 
-export type PerResourcePermission = "read" | "write" | "delete";
+export type PerResourcePermission = "list" | "read" | "write" | "delete";
 export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
 
 type ListPageProps = {
@@ -128,6 +128,12 @@ export const SoloResource = ({
     const [isDirty, setDirty] = useState(false);
     const [currentMode, setCurrentMode] = useState<ResourceViewMode | undefined>(id === undefined ? "creator" : "reader");
     const [resource, setResource] = useState<any | undefined>(undefined);
+    const permissions = useMemo(
+        () => resource === undefined ? [] : getPermissions(resource),
+        [resource, getPermissions]
+    );
+    const isReadable = useMemo(() => permissions.includes("read"), [permissions]);
+    const isWritable = useMemo(() => onCreate !== undefined || permissions.includes("write"), [permissions, onCreate]);
 
     const loadResource = useCallback(() => {
         setInFlight(true);
@@ -224,16 +230,20 @@ export const SoloResource = ({
 
     if (inFlight) {
         return <LinearLoadingAnimation label={"Loading..."}/>;
+    } else if (onCreate === undefined && !isReadable) {
+        return <p>
+            You don't have permission to read this resource.
+        </p>
     } else {
         return (
             <ResourceView
                 fields={schema}
                 data={resource}
                 initialMode={currentMode}
-                isDirty={() => isDirty}
-                onUpdate={updateLocalCopy}
-                onCancel={cancelEditing}
-                onSubmit={updateRemoteCopy}
+                isDirty={isWritable ? () => isDirty : undefined}
+                onUpdate={isWritable ? updateLocalCopy : undefined}
+                onCancel={isWritable ? cancelEditing : undefined}
+                onSubmit={isWritable ? updateRemoteCopy : undefined}
             />
         );
     }
@@ -567,6 +577,9 @@ const ResourceList = ({
                 // Data Table View
             }
             <table className={classNames(["data-table"])}>
+                {
+                    // Data Table Header
+                }
                 <thead>
                 <tr>
                     <th className={"data-table-row-selector"}>
@@ -593,6 +606,9 @@ const ResourceList = ({
                     }
                 </tr>
                 </thead>
+                {
+                    // Data Table Body
+                }
                 <tbody>{resourceList.map(renderResource)}</tbody>
             </table>
         </div>

@@ -35,8 +35,8 @@ export default ({children}: { children: ReactNode }) => {
 
             http.send("get", "/oauth/logout")
                 .then(() => {
-                    storage.remove("access_token");
-                    storage.remove("refresh_token");
+                    storage.remove("access_token"); // FIXME with Token
+                    storage.remove("refresh_token"); // FIXME with Token
                     setInterruptionMessage(null);
                     appState.clearSession();
                     navigate("/login");
@@ -73,7 +73,7 @@ export default ({children}: { children: ReactNode }) => {
 
     return (
         <article className={styles.scaffold}>
-            <div className={styles.scaffoldController}>
+            <div className={styles.foundationNavigation}>
                 <header><AppLogo/></header>
                 {
                     waypointGroups
@@ -91,7 +91,7 @@ export default ({children}: { children: ReactNode }) => {
                     <a onClick={signOut} className={styles.signOutButton}>Sign out</a>
                 </nav>
             </div>
-            <div className={styles.scaffoldBody}>
+            <div className={styles.foundationMain}>
                 {children}
             </div>
         </article>

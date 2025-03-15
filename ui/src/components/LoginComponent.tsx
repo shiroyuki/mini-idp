@@ -97,15 +97,15 @@ const LoginComponent: React.FC<LoginComponentProps> = ({}) => {
 
             if (result.error === null) {
                 if (result.access_token !== null && result.access_token !== "") {
-                    storage.set("access_token", result.access_token);
+                    storage.set("access_token", result.access_token); // FIXME with Token
                 } else {
-                    storage.remove("access_token");
+                    storage.remove("access_token"); // FIXME with Token
                 }
 
                 if (result.refresh_token !== null && result.refresh_token !== "") {
-                    storage.set("refresh_token", result.refresh_token);
+                    storage.set("refresh_token", result.refresh_token); // FIXME with Token
                 } else {
-                    storage.remove("refresh_token");
+                    storage.remove("refresh_token"); // FIXME with Token
                 }
             }
 

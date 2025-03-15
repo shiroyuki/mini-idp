@@ -15,9 +15,8 @@ from requests import Response, Session
 from midp.common.enigma import Enigma
 from midp.common.env_helpers import optional_env
 from midp.common.obj_patcher import PatchOperation
-from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser
+from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser, GrantType
 from midp.log_factory import get_logger_for, get_logger_for_object
-from midp.models import GrantType
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
 from midp.snapshot.models import AppSnapshot
 

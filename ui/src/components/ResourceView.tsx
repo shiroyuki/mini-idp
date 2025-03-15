@@ -1,5 +1,5 @@
 import styles from "./ResourceView.module.css";
-import React, {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
 import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
@@ -32,10 +32,13 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
     }
 
     const [listState, setListState] = useState<ListState | undefined>(undefined);
+    const [queryOnValue, setQueryOnValue] = useState<string>('');
+    const patternQueryOnValue = useMemo<RegExp>(() => new RegExp(queryOnValue.trim(), 'imu'), [queryOnValue]);
 
     const disabled = onUpdate === undefined || schema.readOnly || false;
     const isRenderingList = schema.items && schema.listRendering !== undefined;
-    const fieldLabel = <label htmlFor={schema.title}>{schema.label || schema.title}</label>
+    const fieldLabelText = schema.label || schema.title;
+    const fieldLabel = <label htmlFor={schema.title}>{fieldLabelText}</label>
     const props = {
         disabled: disabled,
         style: schema.style,
@@ -101,20 +104,38 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 const listingClassNames = [styles.itemList];
 
                 if (disabled) {
-                    listingClassNames.push("read-only");
+                    listingClassNames.push(styles.itemListReadOnly);
                 }
+
+                const listData = listState.data as any[];
 
                 return (
                     <div className={classNames([styles.controller])} data-type={"list"}>
                         {fieldLabel}
+                        {
+                            !disabled
+                            && listData.length > 8
+                            && <input
+                                type={"text"}
+                                className={styles.itemListFilter}
+                                value={queryOnValue}
+                                placeholder={`Type something here to filter "${fieldLabelText}"`}
+                                onChange={e => setQueryOnValue(e.currentTarget.value)}
+                            />
+                        }
                         <ul className={classNames([listingClassNames])}>
                             {
-                                (listState.data as any[])
+                                listData
                                     .map(item => listRenderingOption.transformForEditing(data, item) as ListTransformedOption)
                                     .filter(item => {
                                         return (listRenderingOption.list === "selected-only" && item.checked)
                                             || (listRenderingOption.list === "all" && (!disabled || item.checked));
                                     })
+                                    .filter(item => (
+                                        queryOnValue.trim().length === 0 // Filter is not in used.
+                                        || item.value.match(patternQueryOnValue) // Search on the value.
+                                        || item.label?.match(patternQueryOnValue) // Search on the label.
+                                    ))
                                     .map(item => {
                                         const itemLabel = item.label || item.value;
 

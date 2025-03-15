@@ -2,7 +2,7 @@
     display: flex;
 }
 
-.scaffoldController {
+.foundationNavigation {
     display: flex;
     flex-direction: column;
 
@@ -44,7 +44,7 @@
     }
 }
 
-.scaffoldBody {
+.foundationMain {
     overflow: auto;
     order: 2;
     height: 100vh;

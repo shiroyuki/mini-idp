@@ -9,9 +9,8 @@ from requests import Session, Response
 
 from midp.app.web_client import MiniIDP, ClientOutput, WebClientLocalStorageManager
 from midp.common.env_helpers import optional_env
-from midp.iam.models import IAMOAuthClient
+from midp.iam.models import IAMOAuthClient, GrantType
 from midp.log_factory import get_logger_for
-from midp.models import GrantType
 from midp.snapshot.models import AppSnapshot
 from midp.snapshot.utils import bootstrap
 

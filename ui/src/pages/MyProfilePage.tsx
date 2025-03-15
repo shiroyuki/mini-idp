@@ -21,6 +21,7 @@ export const MyProfilePage = () => {
                 id={appState.sessionInfo?.id}
                 baseBackendUri={"/rest/users"}
                 schema={IAM_USER_SCHEMA}
+                getPermissions={() => ["read", "write"]}
             />
         </UIFoundation>
     );

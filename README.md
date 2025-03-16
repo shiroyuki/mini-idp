@@ -15,35 +15,61 @@ The Mini Identity Provider for Local Development and Testing
 * Python 3.9 or newer
 * PostgreSQL 16 or newer (compatible with 14+)
 
+### Requirements for testing and development
+* Python virtual environment, either one of these works.
+  * `venv` - Python's built-in virtual environment
+  * `poetry` - https://python-poetry.org/docs/
+
 ## Setup
 
-### Configuration
+### First-time setup
 
-* The schema of the configuration file is `midp.config.MainConfig`.
-* You can set the environment variable `MINI_IDP_CONFIG_PATHS` to specify the configuration file paths where `,` is the delimiter.
-  * By default, the app will load the config file from `$(pwd)/config-default.yml`.
+#### For any environment
+
+1. Copy `.env.dist` to `.env` and modify as needed. 
+
+#### Testing/Development Environment
+* With `venv`...
+  1. Initialize a new virtual environment with:
+     ```shell
+     python3 -m venv .venv
+     ```
+  2. Activate the virtual environment with:
+     ```shell
+     ./venv/bin/activate
+     ```
+  > This is the simplest option for quick work.
+* With `poetry`...
+  1. Install `poetry`.
+     > WARNING: If you are using IntelliJ or PyCharm, please ensure that poetry is accessible via the default execute path
+       (`$PATH`) as IntelliJ/PyCharm can detect where `poetry` is but cannot find it for some reason.
+  3. Install the shell plugin with:
+     ```shell
+     poetry self add poetry-plugin-shell
+     ```
+  4. Activate the environment with:
+     ```shell
+     poetry shell
+     ```
+
+#### Production Environment
+* Install dependencies
 
 ### Database Migration
 
 Run the SQL scripts in `migrations/` in the alphanumeric order.
 
 ```shell
-psql "postgres://shiroyuki:no-secret@localhost:5432/postgres" -c "CREATE DATABASE miniidp"
-psql "postgres://shiroyuki:no-secret@localhost:5432/miniidp" -v ON_ERROR_STOP=1 -f migrations/001-init.sql
+export MINI_IDP_DB_NAME=miniidp
+psql "postgres://postgres:nosecret@localhost:5432/postgres" -c "CREATE DATABASE ${MINI_IDP_DB_NAME}"
+psql "postgres://postgres:nosecret@localhost:5432/${MINI_IDP_DB_NAME}" -v ON_ERROR_STOP=1 -f migrations/001-init.sql
 ```
 
-#### How to reset the system
+> You can name the database to whatever you want.
 
-```sql
-DELETE FROM iam_scope WHERE id IS NOT NULL;
-DELETE FROM iam_role WHERE id IS NOT NULL;
-DELETE FROM iam_user WHERE id IS NOT NULL;
-DELETE FROM iam_client WHERE id IS NOT NULL;
-DELETE FROM iam_policy WHERE id IS NOT NULL;
-DELETE FROM kv WHERE k IS NOT NULL;
-```
+> In the development and testing, you can also define the environment variable `MINI_IDP_BOOTING_OPTIONS` with `bootstrap:data-reset` (operational data) or bootstrap:session-reset` (session data).
 
-### Signing Keys
+### Create signing keys
 
 ```shell
 openssl genrsa -out private.pem 2048

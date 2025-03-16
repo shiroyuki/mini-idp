@@ -1,0 +1,9 @@
+services:
+  psql:
+    container_name: midp.psql
+    image: postgres:16-alpine
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: nosecret
+    ports:
+      - 5432:5432

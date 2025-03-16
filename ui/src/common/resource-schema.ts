@@ -238,7 +238,7 @@ export const IAM_POLICY_SCHEMA: ResourceSchema[] = [
     },
     {
         title: "name",
-        label: "Username",
+        label: "Policy Name",
         type: "string",
         required: true,
         isReferenceKey: true,

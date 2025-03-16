@@ -161,7 +161,7 @@ function makePolicyManagerPage() {
         schema={IAM_POLICY_SCHEMA}
         listPage={
             {
-                title: "Policies (Beta)",
+                title: "Policies",
             }
         }
         getPermissions={getPermissionPerPolicy}

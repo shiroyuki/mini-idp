@@ -66,6 +66,7 @@
 
     li {
         display: flex;
+        align-items: center;
         padding: 8px;
         border-top: 1px solid var(--lightGrey);
 
@@ -77,6 +78,17 @@
             border-top: none;
         }
     }
+
+    &[data-count="0"] {
+        border-style: dashed;
+    }
+
+    &[data-count="0"]::before {
+        display: block;
+        content: "None";
+        color: var(--grey);
+        padding: 8px;
+    }
 }
 
 .itemListReadOnly {
@@ -86,6 +98,10 @@
         border-top-style: dashed;
         border-top-color: var(--veryLightGrey);
     }
+}
+
+.itemListCheckbox {
+    margin-right: 8px;
 }
 
 .sensitiveInput {
@@ -103,5 +119,34 @@
     button {
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
+    }
+}
+
+.dataBlockReferenceLink {
+    display: inline-flex;
+    align-items: center;
+    color: var(--colourPrimary);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.dataBlockObject {
+    border-spacing: 0;
+    border: 1px solid var(--grey);
+
+    th {
+        text-align: left;
+        padding: 4px 8px !important;
+        border: none !important;
+        border-top: 1px solid var(--lightGrey) !important;
+        border-right: 1px solid var(--lightGrey) !important;
+        background-color: transparent !important;
+    }
+
+    td {
+        padding: 4px 8px !important;
+        border: none !important;
+        border-top: 1px solid var(--lightGrey) !important;
+        background-color: transparent !important;
     }
 }

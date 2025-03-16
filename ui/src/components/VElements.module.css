@@ -9,6 +9,7 @@
 
 .vCheckboxDisabled {
     &.vCheckboxYes {
+        opacity: 0.5;
     }
 
     &.vCheckboxNo {

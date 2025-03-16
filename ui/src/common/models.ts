@@ -36,7 +36,7 @@ export interface IAMOAuthClient {
 
 export interface IAMPolicySubject {
     subject: string;
-    kind: string; // should match 'client' | 'user' | 'role'
+    kind: "client" | "role" | "user";
 }
 
 export interface IAMPolicy {

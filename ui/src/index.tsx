@@ -7,7 +7,13 @@ import {createHashRouter, RouterProvider} from 'react-router-dom';
 import LoginComponent from "./components/LoginComponent";
 import UIFoundation from "./components/UIFoundation";
 import {PerResourcePermission, PerResourcePermissionFetcher, ResourceManagerPage} from "./pages/ResourceManagerPage";
-import {IAM_OAUTH_CLIENT_SCHEMA, IAM_ROLE_SCHEMA, IAM_SCOPE_SCHEMA, IAM_USER_SCHEMA} from "./common/resource-schema";
+import {
+    IAM_OAUTH_CLIENT_SCHEMA,
+    IAM_POLICY_SCHEMA,
+    IAM_ROLE_SCHEMA,
+    IAM_SCOPE_SCHEMA,
+    IAM_USER_SCHEMA
+} from "./common/resource-schema";
 import {FrontPage} from "./pages/FrontPage";
 import {MyProfilePage} from "./pages/MyProfilePage";
 import {IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
@@ -148,6 +154,20 @@ function makeOAuthClientManagerPage() {
     />
 }
 
+function makePolicyManagerPage() {
+    return <ResourceManagerPage
+        baseBackendUri={"/rest/policies"}
+        baseFrontendUri={"/policies"}
+        schema={IAM_POLICY_SCHEMA}
+        listPage={
+            {
+                title: "Policies (Beta)",
+            }
+        }
+        getPermissions={getPermissionPerPolicy}
+    />
+}
+
 const router = createHashRouter([
     {
         path: '/',
@@ -208,6 +228,17 @@ const router = createHashRouter([
                     {
                         path: ":id",
                         element: makeOAuthClientManagerPage(),
+                    }
+                ]
+            },
+            {
+                path: 'policies',
+                // @ts-ignore
+                element: makePolicyManagerPage(),
+                children: [
+                    {
+                        path: ":id",
+                        element: makePolicyManagerPage(),
                     }
                 ]
             },

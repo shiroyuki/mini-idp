@@ -4,14 +4,14 @@ import {Navigation, UIFoundationHeader} from "../components/UIFoundationHeader";
 import {ClientOptions, http} from "../common/http-client";
 import classNames from "classnames";
 import {LinearLoadingAnimation} from "../components/loaders";
-import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
 import {Link, useNavigate, useParams} from "react-router-dom";
-import {ResourceView, ResourceViewMode} from "../components/ResourceView";
+import {DataBlock, ResourceView, ResourceViewMode} from "../components/ResourceView";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 import styles from "./ResourceManagerPage.module.css"
-import {GenericModel} from "../common/definitions";
+import {ErrorFeedback, GenericModel} from "../common/definitions";
+import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
 
 export type PerResourcePermission = "list" | "read" | "write" | "delete";
 export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
@@ -163,12 +163,12 @@ export const SoloResource = ({
         if (id === undefined) {
             const data = await http.sendAndMapAs<GenericModel>("post", `${baseBackendUri}/`, makeClientOptions({json: resource}));
             if (onCreate && data) {
-                onCreate(data as GenericModel)
+                onCreate(data as GenericModel);
             }
+            return []
         } else {
             if (!resource) {
-                console.warn("Invalid state to update");
-                return null;
+                return [{error: "not_found"}];
             }
 
             const patch = schema
@@ -189,11 +189,11 @@ export const SoloResource = ({
                 setResource(data);
                 setDirty(false);
                 setCurrentMode("reader");
-                return data;
+                return [];
             } catch (error) {
                 console.warn(`Encountered unexpected error: ${error}`);
                 setCurrentMode("editor");
-                return null;
+                return [{error: "unexpected"}];
             }
         }
     }, [resource, schema, baseBackendUri, id, onCreate]);
@@ -239,6 +239,7 @@ export const SoloResource = ({
             <ResourceView
                 fields={schema}
                 data={resource}
+                style={{marginBottom: "24px"}}
                 initialMode={currentMode}
                 isDirty={isWritable ? () => isDirty : undefined}
                 onUpdate={isWritable ? updateLocalCopy : undefined}
@@ -264,6 +265,7 @@ const ResourceList = ({
                           schema,
                           getPermissions,
                       }: ListProps) => {
+    const navigate = useNavigate();
     const [inFlight, setInFlight] = useState<number>(0);
     const [dataTableControllerMode, setDataTableControllerMode] = useState<DataTableControllerMode>("navigator");
     const [cacheMap, setCacheMap] = useState<{ [key: string]: any }>({});
@@ -333,6 +335,7 @@ const ResourceList = ({
     useEffect(() => {
         setResourceList([]);
         setCacheMap({});
+        setSelectionList([]);
         loadResources();
     }, [schema, baseBackendUri]);
 
@@ -371,21 +374,34 @@ const ResourceList = ({
         [setDataTableControllerMode]
     )
 
+    const renderValueWithoutSchema = useCallback((data: any) => {
+        const dataType = typeof data;
+
+        switch (dataType) {
+            case "string":
+            case "number":
+                return data;
+            case "boolean":
+        }
+    }, [])
+
     const renderFieldValueAsList = useCallback((fieldKey: string, fieldData: any[], listRenderingOption: ListRenderingOptions) => {
         if (cacheMap[fieldKey] === undefined) {
-            console.warn(`No cache map for ${fieldKey}`);
+            console.log(`No cache map for ${fieldKey}`);
             return <LinearLoadingAnimation/>;
         } else {
-            return <ul>
+            const filteredList = (cacheMap[fieldKey] as any[])
+                .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
+                .map(loadedItem => listRenderingOption.normalize(fieldData, loadedItem) as NormalizedItem<any>)
+                .filter(loadedItem => loadedItem.checked);
+            // TODO Handled structured data with DataBlock
+            return <ul data-count={filteredList.length}>
                 {
-                    (cacheMap[fieldKey] as any[])
-                        .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
-                        .map(loadedItem => listRenderingOption.normalize(fieldData, loadedItem) as ListTransformedOption)
-                        .filter(loadedItem => loadedItem.checked)
+                    filteredList
                         .map(item => (
                             <li key={item.value}
                                 className={classNames([item.checked ? "selected" : "not-selected"])}>
-                                {item.label}
+                                {item.label ?? <DataBlock data={item.value} />}
                             </li>
                         ))
                 }
@@ -394,36 +410,15 @@ const ResourceList = ({
     }, [cacheMap]);
 
     const renderFieldValueAsPrimitive = useCallback((field: ResourceSchema, fieldData: any) => {
-        let renderedValue: any;
+        const handleClick = field.isReferenceKey
+            ? ((data: any) => navigate(`${baseFrontendUri}/${data}`))
+            : undefined;
 
-        if (fieldData === undefined || fieldData === null) {
-            return "";
-        }
-
-        switch (field.type) {
-            case "boolean":
-                renderedValue = fieldData ? "true" : "false";
-                break;
-            case "number":
-            case "integer":
-            case "float":
-                renderedValue = fieldData;
-                break;
-            case "object":
-                renderedValue = <span style={{whiteSpace: "pre-wrap"}}
-                                      dangerouslySetInnerHTML={{__html: JSON.stringify(fieldData)}}/>
-                break;
-            default:
-                renderedValue = fieldData;
-                break;
-        }
-
-        if (field.isReferenceKey) {
-            return <Link to={`${baseFrontendUri}/${fieldData}`}>{renderedValue}</Link>
-        } else {
-            return renderedValue;
-        }
-    }, [baseFrontendUri]);
+        return <DataBlock
+            data={fieldData}
+            onClick={handleClick}
+        />;
+    }, [baseFrontendUri, navigate]);
 
     const renderField = useCallback((field: ResourceSchema, resource: GenericModel) => {
         const fieldKey = field.title as string;

@@ -1,10 +1,11 @@
 import styles from "./ResourceView.module.css";
-import React, {useCallback, useEffect, useMemo, useState} from "react";
+import React, {CSSProperties, useCallback, useEffect, useMemo, useState} from "react";
 import {LinearLoadingAnimation} from "./loaders";
 import classNames from "classnames";
-import {ListRenderingOptions, ListTransformedOption, ResourceSchema} from "../common/resource-schema";
 import Icon from "./Icon";
-import {GenericModel} from "../common/definitions";
+import {ErrorFeedback, GenericModel} from "../common/definitions";
+import {VCheckbox} from "./VElements";
+import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
 
 type FieldInputProps = {
     schema: ResourceSchema;
@@ -15,6 +16,64 @@ type FieldInputProps = {
 type ListState = {
     inFlight: boolean;
     data?: any[];
+}
+
+type DataBlockProps = {
+    data: any;
+    onClick?: (data: any) => void;
+}
+
+export const DataBlock = ({data, onClick}: DataBlockProps) => {
+    if (data === undefined || data === null) {
+        return <div className={"value-placeholder"}>null</div>;
+    }
+
+    const dataType = typeof data;
+    let renderedValue: any;
+
+    if (dataType === "object") {
+        // TODO Handle recursion
+        return (
+            <table className={styles.dataBlockObject}>
+                <tbody>
+                {
+                    Object.keys(data)
+                        .map((key: string) => {
+                            return (
+                                <tr key={key}>
+                                    <th>{key}</th>
+                                    <td><DataBlock data={data[key]}/></td>
+                                </tr>
+                            )
+                        })
+                }
+                </tbody>
+            </table>
+        )
+    } else {
+        switch (dataType) {
+            case "string":
+            case "number":
+                renderedValue = data;
+                break;
+            case "boolean":
+                renderedValue = data ? "true" : "false";
+                break;
+            default:
+                throw new Error(`Unknown data type of ${dataType}`);
+        }
+
+        if (onClick) {
+            return <a className={styles.dataBlockReferenceLink} onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                onClick(data);
+            }}>{renderedValue}</a>;
+        } else {
+            return renderedValue;
+        }
+    }
 }
 
 const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
@@ -98,7 +157,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
             return <LinearLoadingAnimation label={"Please wait..."}/>;
         } else if (listState) {
             if (listState.inFlight) {
-                return <LinearLoadingAnimation label={"Loading..."}/>;
+                return <LinearLoadingAnimation label={`Loading ${fieldLabelText}...`}/>;
             } else {
                 const listRenderingOption = schema.listRendering as ListRenderingOptions;
                 const listingClassNames = [styles.itemList];
@@ -108,6 +167,17 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                 }
 
                 const listData = listState.data as any[];
+                const filteredList = listData
+                    .map(item => listRenderingOption.normalize(data, item) as NormalizedItem<any>)
+                    .filter(item => {
+                        return (listRenderingOption.list === "selected-only" && item.checked)
+                            || (listRenderingOption.list === "all" && (!disabled || item.checked));
+                    })
+                    .filter(item => (
+                        queryOnValue.trim().length === 0 // Filter is not in used.
+                        || item.value.match(patternQueryOnValue) // Search on the value.
+                        || item.label?.match(patternQueryOnValue) // Search on the label.
+                    ));
 
                 return (
                     <div className={classNames([styles.controller])} data-type={"list"}>
@@ -123,31 +193,24 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                                 onChange={e => setQueryOnValue(e.currentTarget.value)}
                             />
                         }
-                        <ul className={classNames([listingClassNames])}>
+                        <ul className={classNames([listingClassNames])} data-count={filteredList.length}>
                             {
-                                listData
-                                    .map(item => listRenderingOption.normalize(data, item) as ListTransformedOption)
-                                    .filter(item => {
-                                        return (listRenderingOption.list === "selected-only" && item.checked)
-                                            || (listRenderingOption.list === "all" && (!disabled || item.checked));
-                                    })
-                                    .filter(item => (
-                                        queryOnValue.trim().length === 0 // Filter is not in used.
-                                        || item.value.match(patternQueryOnValue) // Search on the value.
-                                        || item.label?.match(patternQueryOnValue) // Search on the label.
-                                    ))
+                                filteredList
                                     .map(item => {
                                         const itemLabel = item.label || item.value;
 
                                         return (
                                             <li key={item.value}>
-                                                <input
-                                                    type={"checkbox"}
-                                                    disabled={disabled}
+                                                <VCheckbox
+                                                    className={styles.itemListCheckbox}
                                                     checked={item.checked}
-                                                    onChange={e => updateList(schema.title as string, item.value, e.target.checked)}
+                                                    value={item.value}
+                                                    disabled={disabled}
+                                                    onChange={(value, nextChecked) => {
+                                                        updateList(schema.title as string, value, nextChecked);
+                                                    }}
                                                 />
-                                                <span>{itemLabel}</span>
+                                                <span><DataBlock data={itemLabel}/></span>
                                             </li>
                                         );
                                     })
@@ -220,14 +283,24 @@ export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing" | "
 type ResourceProp = {
     data?: GenericModel;
     fields: ResourceSchema[];
+    style?: CSSProperties;
     initialMode?: ResourceViewMode;
     isDirty?: () => boolean;
     onCancel?: () => void;
-    onSubmit?: () => Promise<any> | null;
+    onSubmit?: () => Promise<ErrorFeedback[]>;
     onUpdate?: (key: string, value: any) => any;
 }
 
-export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCancel, onSubmit}: ResourceProp) => {
+export const ResourceView = ({
+                                 fields,
+                                 data,
+                                 style,
+                                 initialMode,
+                                 isDirty,
+                                 onUpdate,
+                                 onCancel,
+                                 onSubmit
+                             }: ResourceProp) => {
     const [mode, setMode] = React.useState<ResourceViewMode | undefined>(initialMode || "reader");
 
     if (onUpdate && !onCancel) {
@@ -241,12 +314,13 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
             e.stopPropagation();
             if (onSubmit) {
                 setMode("writing");
-                const errors = (await onSubmit()) || [];
+                const errors: ErrorFeedback[] = (await onSubmit()) || [];
                 if (errors.length === 0) {
                     setMode("reader");
                 } else {
                     setMode("editor");
                     // TODO: Implement the form error feedback.
+                    console.log(errors);
                 }
             }
         },
@@ -285,7 +359,7 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
     }
 
     return (
-        <form className={styles.resourceForm} onSubmit={handleFormSubmission} autoComplete="off">
+        <form className={styles.resourceForm} style={style} onSubmit={handleFormSubmission} autoComplete="off">
             <div className={styles.controllers}>
                 {
                     fields
@@ -294,11 +368,7 @@ export const ResourceView = ({fields, data, initialMode, isDirty, onUpdate, onCa
                                 return false; // the fully generated field will not be editable.
                             } else if (mode === "creator") {
                                 return true; // show all fields
-                            } else if (f.hidden) {
-                                return false;
-                            } else {
-                                return true;
-                            }
+                            } else return !f.hidden;
                         })
                         .map(f => (
                             <FieldInput

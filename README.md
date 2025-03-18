@@ -14,6 +14,8 @@ The Mini Identity Provider for Local Development and Testing
 
 * Python 3.9 or newer
 * PostgreSQL 16 or newer (compatible with 14+)
+  * For macOS and Linux, use `psycopg` for the driver.
+  * For Windows, use `pg8000` for the driver.
 
 ### Requirements for testing and development
 * Python virtual environment, either one of these works.
@@ -54,6 +56,10 @@ The Mini Identity Provider for Local Development and Testing
 
 #### Production Environment
 * Install dependencies
+
+#### Note for Windows
+
+Some libraries may not work correctly. Please fix compatibility issues case by case.
 
 ### Database Migration
 

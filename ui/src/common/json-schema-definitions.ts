@@ -1,5 +1,6 @@
-import {Comparator, DataLoader, GenericModel} from "./definitions";
+import {Comparator, DataLoader, ErrorFeedback, GenericModel} from "./definitions";
 import {CSSProperties} from "react";
+import {Validator} from "./validation";
 
 export type JsonSchemaDataType = "string" | "number" | "integer" | "float" | "boolean" | "object";
 export type NormalizedItem<T> = {
@@ -16,6 +17,7 @@ export type ListRenderingOptions = {
     compare?: Comparator<any>;
     normalize: ListItemNormalizer<any, any>;
 };
+
 /**
  * JSON Schema (custom)
  */
@@ -30,6 +32,7 @@ export type ResourceSchema = {
     label?: string;
     readOnly?: boolean;
     hidden?: boolean;
+    constrains?: Validator<any>[];
     default?: any;
     /**
      * The capability for auto-generation

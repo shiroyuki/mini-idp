@@ -42,7 +42,7 @@ class KeyStorage(ABC):
 
     def get(self, key: str) -> Any:
         params = self.get_pk_params(key)
-        params.update(dict(current_time=time()))
+        params.update(dict(current_time=int(time())))
 
         values = [
             row.v
@@ -69,7 +69,7 @@ class KeyStorage(ABC):
     def delete(self, key: str):
         """ Delete the given key or the expired keys """
         params = self.get_pk_params(key)
-        params.update(dict(current_time=time()))
+        params.update(dict(current_time=int(time())))
 
         self._datastore.execute_without_result(
             f"""
@@ -89,7 +89,7 @@ class KeyStorage(ABC):
                 serialized_value = json.dumps(entry.value)
 
                 params = self.get_pk_params(entry.key)
-                params.update(dict(v=serialized_value, current_time=time(), expiry_timestamp=entry.expiry_timestamp))
+                params.update(dict(v=serialized_value, current_time=int(time()), expiry_timestamp=entry.expiry_timestamp))
 
                 insert_ok = c.execute(
                     text(
@@ -125,4 +125,4 @@ class KeyStorage(ABC):
             c.commit()
 
     def set(self, key: str, value: Any, expiry_timestamp: Optional[int] = None):
-        self.batch_set(Entry(key=key, value=value, expiry_timestamp=expiry_timestamp))
+        self.batch_set(Entry(key=key, value=value, expiry_timestamp=int(expiry_timestamp) if expiry_timestamp else None))

@@ -15,7 +15,7 @@ from midp.log_factory import get_logger_for_object
 
 @Service()
 class Enigma:
-    def __init__(self, ):
+    def __init__(self, cryptographic_algorithm: Optional[str] = None, hashing_algorithm: Optional[str] = None):
         self._log = get_logger_for_object(self)
 
         self._private_key: Optional[RSAPrivateKey] = None
@@ -46,11 +46,12 @@ class Enigma:
         else:
             self._log.debug("The public key file (PEM) and the cryptographic features are not available.")
 
-        self._algorithm = 'RS256'
+        self._cryptographic_algorithm = cryptographic_algorithm or 'RS256'
+        self._hashing_algorithm = hashing_algorithm or 'sha512'
 
     def compute_hash(self, token: str) -> str:
         """ Compute the hash of the given token """
-        m = hashlib.new('sha512')
+        m = hashlib.new(self._hashing_algorithm)
         m.update(token.encode('utf-8'))
         return m.hexdigest()
 
@@ -67,7 +68,7 @@ class Enigma:
         return jwt.decode(
             token,
             key=self._public_key,
-            algorithms=[self._algorithm],
+            algorithms=[self._cryptographic_algorithm],
             issuer=issuer,
             audience=audience,
         )
@@ -76,7 +77,7 @@ class Enigma:
         """ Encode the payload into a JWT string """
         self._assert_cryptographic_capabilities()
 
-        return jwt.encode(payload=payload, key=self._private_key, algorithm=self._algorithm)
+        return jwt.encode(payload=payload, key=self._private_key, algorithm=self._cryptographic_algorithm)
 
     def encrypt(self, message: Union[bytes, str], *, as_hex: bool = True) -> bytes:
         """ Encrypt the message with a permanent key pair """

@@ -6,33 +6,33 @@ import {ErrorFeedback} from "./definitions";
 export type ValidationResult = ErrorFeedback | null;
 export type Validator<T> = (value: T, ...options: any[]) => ValidationResult;
 
-export const isNotNull = () => {
-    return (value: any): ValidationResult => {
-        if (value === undefined || value === null) {
-            return {
-                error: "undefined_mandatory_field",
-                error_description: "Missing required field",
-            }
+const drainRegExpResultIterator = (iterator: { next(): { value: any, done: boolean } } extends any) => {
+    const collection = [];
+    while (true) {
+        const item = iterator.next();
+        if (item.done) {
+            break;
         } else {
-            return null;
+            collection.push(item.value);
         }
     }
-};
+    return collection;
+}
 
-export const isAlternativeId = (error_code?: string, error_description?: string) => {
+export const validAlternativeId = (minCharacters?: number, maxCharacters?: number) => {
     return (value: string): ValidationResult => {
-        if (value.match(/^[a-zA-Z0-9][a-zA-Z0-9\-_.]+[a-zA-Z0-9]$/)) {
-            return null;
-        } else {
+        if (!value.match(/^[a-zA-Z][a-zA-Z0-9\-_.]+[a-zA-Z0-9]$/)) {
             return {
-                error: error_code || "invalid_alternative_id",
-                error_description: error_description || "Invalid alternative ID",
+                error: "invalid_alternative_id.pattern",
+                error_description: "Must start and end with characters (A-Z). Anything else in between can be alphanumerics (characters and numbers), dashes, underscores, and dots.",
             }
+        } else {
+            return null;
         }
     }
 };
 
-export const isEmailAddress = () => {
+export const validEmailAddress = () => {
     return (value: string): ValidationResult => {
         if (value.match(/^[^@]+@[^@]+$/)) {
             return null;
@@ -44,6 +44,60 @@ export const isEmailAddress = () => {
         }
     }
 };
+
+export const validUri = () => {
+    return (value: string): ValidationResult => {
+        if (value.match(/^https?:\/\/.+$/)) {
+            return null;
+        } else {
+            return {
+                error: "invalid_uri",
+                error_description: "Invalid URI",
+            }
+        }
+    }
+}
+
+export const securePassword = () => {
+    return (value: string): ValidationResult => {
+        let reasons: string[] = [];
+
+        if (value.length < 8) {
+            reasons.push("min_length")
+        }
+
+        let uppercaseLetterCount = drainRegExpResultIterator(value.matchAll(/[a-z]/g)).length;
+        if (uppercaseLetterCount === 0) {
+            reasons.push("no_uppercase_letter");
+        }
+
+        let lowercaseLetterCount = drainRegExpResultIterator(value.matchAll(/[A-Z]/g)).length;
+        if (lowercaseLetterCount === 0) {
+            reasons.push("no_lowercase_letter");
+        }
+
+        let numberCount = drainRegExpResultIterator(value.matchAll(/[0-9]/g)).length;
+        if (numberCount === 0) {
+            reasons.push("no_number");
+        }
+
+        let symbolCount = drainRegExpResultIterator(value.matchAll(/[,;:=!-_.+?#@$%^&*()\[\]|{}<>/]/g)).length;
+        if (symbolCount === 0) {
+            reasons.push("no_symbol");
+        }
+
+        if (reasons.length === 0) {
+            return null;
+        } else {
+            return {
+                error: "insecure_password",
+                error_description: {
+                    reasons: reasons,
+                },
+            }
+        }
+    }
+}
 
 export const hasPattern = (pattern: RegExp, error_code: string, error_description: string) => {
     return (value: string): ValidationResult => {
@@ -58,38 +112,51 @@ export const hasPattern = (pattern: RegExp, error_code: string, error_descriptio
     }
 };
 
-export const maximumSizeOf = (limit: number) => {
-    return (value: string|any[]): ValidationResult => {
+export const maximumSizeOf = (limit: number, quantifier?: string) => {
+    return (value: string | any[]): ValidationResult => {
         if (value.length <= limit) {
             return null;
-        } else if (Array.isArray(value)) {
-            return {
-                error: "list_too_long",
-                error_description: `Must have at most ${limit}`,
-            }
         } else {
             return {
-                error: "string_too_long",
-                error_description: `Must be at most ${limit} character(s)`,
-            }
+                error: "too_many",
+                error_description: {
+                    current: value.length,
+                    limit: limit,
+                    quantifier: quantifier,
+                },
+            };
         }
     };
 };
 
-export const minimumSizeOf = (limit: number) => {
-    return (value: string|any[]): ValidationResult => {
+export const minimumSizeOf = (limit: number, quantifier?: string) => {
+    return (value: string | any[]): ValidationResult => {
         if (value.length >= limit) {
             return null;
-        } else if (Array.isArray(value)) {
-            return {
-                error: "list_too_short",
-                error_description: `Must have at least ${limit}`,
-            }
         } else {
             return {
-                error: "string_too_short",
-                error_description: `Must be at least ${limit} character(s)`,
-            }
+                error: "too_few",
+                error_description: {
+                    current: value.length,
+                    limit: limit,
+                    quantifier: quantifier,
+                },
+            };
         }
     };
 };
+
+export const mustBeAlternativeId = (minCharacters?: number, maxCharacters?: number): Validator<string>[] => {
+    return [
+        minimumSizeOf(minCharacters || 2),
+        maximumSizeOf(maxCharacters || 48),
+        validAlternativeId(),
+    ]
+}
+
+export const mustBeEmailAddress = (): Validator<string>[] => {
+    return [
+        minimumSizeOf(8),
+        validEmailAddress(),
+    ]
+}

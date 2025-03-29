@@ -7,31 +7,42 @@ import jwt
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from imagination.decorator.service import Service
+from imagination.decorator import EnvironmentVariable
+from imagination.decorator.service import registered
 
 from midp.common.env_helpers import optional_env
 from midp.log_factory import get_logger_for_object
 
 
-@Service()
+@registered(
+    params=[
+        EnvironmentVariable(
+            name='private_key_pem_file_path',
+            env='MINI_IDP_PRIVATE_KEY_FILE',
+            default='private.pem',
+            allow_default=True
+        ),
+        EnvironmentVariable(
+            name='public_key_pem_file_path',
+            env='MINI_IDP_PUBLIC_KEY_FILE',
+            default='public.pem',
+            allow_default=True
+        ),
+    ]
+)
 class Enigma:
-    def __init__(self, cryptographic_algorithm: Optional[str] = None, hashing_algorithm: Optional[str] = None):
+    def __init__(self,
+                 private_key_pem_file_path: str,
+                 public_key_pem_file_path: str,
+                 cryptographic_algorithm: Optional[str] = None,
+                 hashing_algorithm: Optional[str] = None):
         self._log = get_logger_for_object(self)
 
         self._private_key: Optional[RSAPrivateKey] = None
         self._public_key: Optional[RSAPublicKey] = None
 
-        self._private_key_pem_file_path = optional_env(
-            'MINI_IDP_PRIVATE_KEY_FILE',
-            'private.pem',
-            help="The path to the private key PEM file",
-        )
-
-        self._public_key_pem_file_path = optional_env(
-            'MINI_IDP_PUBLIC_KEY_FILE',
-            'public.pem',
-            help="The path to the private key PEM file",
-        )
+        self._private_key_pem_file_path = private_key_pem_file_path
+        self._public_key_pem_file_path = public_key_pem_file_path
 
         # TODO Improve with https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/.
         if os.path.exists(self._private_key_pem_file_path):

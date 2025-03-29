@@ -9,6 +9,14 @@ import {
     createOptionFromPrimitiveValue,
     sendListRequestTo, createComplexOptionFromObject, compareItemsWithKey
 } from "./json-schema-utils";
+import {
+    mustBeAlternativeId,
+    minimumSizeOf,
+    mustBeEmailAddress,
+    securePassword, validUri
+} from "./validation";
+import {http} from "./http-client";
+import {AppConfig} from "./local-models";
 
 export const IAM_ROLE_SCHEMA: ResourceSchema[] = [
     {
@@ -26,6 +34,7 @@ export const IAM_ROLE_SCHEMA: ResourceSchema[] = [
         label: "Name",
         type: "string",
         required: true,
+        constrains: [...mustBeAlternativeId()],
         isReferenceKey: true,
     },
     {
@@ -52,6 +61,7 @@ export const IAM_SCOPE_SCHEMA: ResourceSchema[] = [
         label: "Name",
         type: "string",
         required: true,
+        constrains: [...mustBeAlternativeId()],
         isReferenceKey: true,
     },
     {
@@ -63,6 +73,7 @@ export const IAM_SCOPE_SCHEMA: ResourceSchema[] = [
         title: "sensitive",
         label: "Sensitive",
         type: "boolean",
+        required: true,
     },
 ];
 
@@ -106,6 +117,7 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         label: "Client ID",
         type: "string",
         required: true,
+        constrains: [...mustBeAlternativeId()],
         isReferenceKey: true,
     },
     {
@@ -120,15 +132,23 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         required: true,
         sensitive: true,
         hidden: true,
+        autoGenerationCapability: "full:post",
     },
     {
         title: "audience",
         label: "Audience",
         type: "string",
+        required: true,
+        autoGenerationCapability: "init:pre",
+        autoGenerate: async () => {
+            return (await http.sendAndMapAs<AppConfig>("get", "/rest/app-config")).defaultAudienceUri;
+        }
     },
     {
         title: "grant_types",
         label: "Grant Types",
+        required: true,
+        constrains: [minimumSizeOf(1)],
         items: {
             type: "string",
         },
@@ -142,6 +162,8 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
     {
         title: "response_types",
         label: "Response Types",
+        required: true,
+        constrains: [minimumSizeOf(1)],
         items: {
             type: "string",
         },
@@ -186,18 +208,21 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         type: "string",
         required: true,
         isReferenceKey: true,
+        constrains: [...mustBeAlternativeId()],
     },
     {
         title: "email",
         label: "E-mail Address",
         type: "string",
         required: true,
+        constrains: [...mustBeEmailAddress()],
     },
     {
         title: "full_name",
         label: "Full Name",
         type: "string",
         required: true,
+        constrains: [minimumSizeOf(4)],
     },
     {
         title: "password",
@@ -206,6 +231,7 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
         required: true,
         sensitive: true,
         hidden: true,
+        constrains: [securePassword()],
     },
     {
         title: "roles",
@@ -241,17 +267,25 @@ export const IAM_POLICY_SCHEMA: ResourceSchema[] = [
         label: "Policy Name",
         type: "string",
         required: true,
+        constrains: [...mustBeAlternativeId()],
         isReferenceKey: true,
     },
     {
         title: "resource",
         label: "Resource URL",
         type: "string",
-        required: false,
+        required: true,
+        constrains: [validUri()],
+        autoGenerationCapability: "init:pre",
+        autoGenerate: async () => {
+            return (await http.sendAndMapAs<AppConfig>("get", "/rest/app-config")).defaultAudienceUri;
+        },
     },
     {
         title: "subjects",
         label: "Subjects",
+        required: true,
+        constrains: [minimumSizeOf(1)],
         items: {
             type: "object",
             // TODO handle this type of rendering
@@ -292,6 +326,8 @@ export const IAM_POLICY_SCHEMA: ResourceSchema[] = [
     {
         title: "scopes",
         label: "Scopes",
+        required: true,
+        constrains: [minimumSizeOf(1)],
         items: {
             type: "string",
         },

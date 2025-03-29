@@ -25,6 +25,9 @@ export type ResourceSchema = {
     ///// Standard JSON Schema /////
     title?: string;
     type?: JsonSchemaDataType;
+    /**
+     * When it is TRUE, this property is considered as mandatory and cannot be null, undefined, or empty (blank string only).
+     */
     required?: boolean;
     items?: ResourceSchema;
     properties?: ResourceSchema[];
@@ -39,11 +42,12 @@ export type ResourceSchema = {
      *
      * - full:pre = fully automated by the UI
      * - full:post = fully automated by the backend
-     * - semi = automated by the backend if not available.
+     * - init:pre = pre-filled by the UI with the autoGenerate function or the default value (default)
+     * - init:post = filled by the backend if not available
      * - UNDEFINED = no automation available
      */
-    autoGenerationCapability?: "full:pre" | "full:post" | "semi";
-    autoGenerate?: () => any;
+    autoGenerationCapability?: "full:pre" | "full:post" | "init:pre" | "init:post";
+    autoGenerate?: () => Promise<any>;
     isPrimaryKey?: boolean;
     isReferenceKey?: boolean;
     ///// For sensitive information, e.g. password /////

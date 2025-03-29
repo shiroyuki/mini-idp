@@ -3,3 +3,7 @@ export type FormError = {
     type?: "validation"; // more types to be implemented
     message: string;
 }
+
+export type AppConfig = {
+    defaultAudienceUri: string;
+}

@@ -18,10 +18,12 @@ export type ListRenderingOptions = {
     normalize: ListItemNormalizer<any, any>;
 };
 
+export type PropertyToJsonSchemaMap = {[field: string]: JsonSchema};
+
 /**
  * JSON Schema (custom)
  */
-export type ResourceSchema = {
+export type JsonSchema = {
     ///// Standard JSON Schema /////
     title?: string;
     type?: JsonSchemaDataType;
@@ -29,8 +31,8 @@ export type ResourceSchema = {
      * When it is TRUE, this property is considered as mandatory and cannot be null, undefined, or empty (blank string only).
      */
     required?: boolean;
-    items?: ResourceSchema;
-    properties?: ResourceSchema[];
+    items?: JsonSchema;
+    properties?: PropertyToJsonSchemaMap;
     ///// Custom properties /////
     label?: string;
     readOnly?: boolean;
@@ -59,5 +61,7 @@ export type ResourceSchema = {
     className?: string;
     style?: CSSProperties;
     ///// For custom rendering /////
-    render?: (schema: ResourceSchema, data: any) => any;
+    render?: (schema: JsonSchema, data: any) => any;
 };
+
+export const convertPropertyMapToList = () => {}

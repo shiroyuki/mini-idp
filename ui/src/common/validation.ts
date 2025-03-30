@@ -2,6 +2,7 @@
  * Validators
  */
 import {ErrorFeedback} from "./definitions";
+import {JsonSchema} from "./json-schema-definitions";
 
 export type ValidationResult = ErrorFeedback | null;
 export type Validator<T> = (value: T, ...options: any[]) => ValidationResult;
@@ -159,4 +160,21 @@ export const mustBeEmailAddress = (): Validator<string>[] => {
         minimumSizeOf(8),
         validEmailAddress(),
     ]
+}
+
+export type ObjectValidationResult = {
+    [field: string]: { schema: JsonSchema, problems: ValidationResult[] };
+}
+
+export const validateObject = (object: Object, schema: JsonSchema): ObjectValidationResult => {
+    const result: ObjectValidationResult = {};
+
+    Object.keys(object)
+        .forEach(field => {
+            // TODO check whether the field is defined.
+            // const fieldSchema = schema.propertyList.filter()
+            // result[field] = {
+            //     schema: //
+            // };
+        })
 }

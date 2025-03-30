@@ -5,10 +5,10 @@ import classNames from "classnames";
 import Icon from "./Icon";
 import {ErrorFeedback, GenericModel} from "../common/definitions";
 import {VCheckbox} from "./VElements";
-import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
+import {ListRenderingOptions, NormalizedItem, JsonSchema} from "../common/json-schema-definitions";
 
 type FieldInputProps = {
-    schema: ResourceSchema;
+    schema: JsonSchema;
     data: any;
     onUpdate?: (key: string, value: any) => any;
 };
@@ -282,7 +282,7 @@ export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing" | "
 
 type ResourceProp = {
     data?: GenericModel;
-    fields: ResourceSchema[];
+    schema: JsonSchema;
     style?: CSSProperties;
     initialMode?: ResourceViewMode;
     isDirty?: () => boolean;
@@ -292,7 +292,7 @@ type ResourceProp = {
 }
 
 export const ResourceView = ({
-                                 fields,
+                                 schema,
                                  data,
                                  style,
                                  initialMode,
@@ -362,8 +362,8 @@ export const ResourceView = ({
         <form className={styles.resourceForm} style={style} onSubmit={handleFormSubmission} autoComplete="off">
             <div className={styles.controllers}>
                 {
-                    fields
-                        .filter(f => {
+                    Object.entries(schema.properties)
+                        .filter((fieldName, f) => {
                             if (f.autoGenerationCapability === "full:post" || f.autoGenerationCapability === "full:pre") {
                                 return false; // the fully generated field will not be editable.
                             } else if (mode === "creator") {

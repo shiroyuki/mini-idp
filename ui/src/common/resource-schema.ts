@@ -1,5 +1,5 @@
 import {IAMOAuthClient, IAMPolicySubject, IAMRole, IAMScope, IAMUser} from "./models";
-import {ResourceSchema} from "./json-schema-definitions";
+import {JsonSchema} from "./json-schema-definitions";
 import {
     compareItemsWith,
     comparePrimitiveValues,
@@ -18,7 +18,7 @@ import {
 import {http} from "./http-client";
 import {AppConfig} from "./local-models";
 
-export const IAM_ROLE_SCHEMA: ResourceSchema[] = [
+export const IAM_ROLE_SCHEMA: JsonSchema[] = [
     {
         title: "id",
         label: "ID",
@@ -45,7 +45,7 @@ export const IAM_ROLE_SCHEMA: ResourceSchema[] = [
     },
 ];
 
-export const IAM_SCOPE_SCHEMA: ResourceSchema[] = [
+export const IAM_SCOPE_SCHEMA: JsonSchema[] = [
     {
         title: "id",
         label: "ID",
@@ -101,7 +101,7 @@ const KNOWN_GRANT_TYPES: LocalGrantType[] = [
     },
 ];
 
-export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
+export const IAM_OAUTH_CLIENT_SCHEMA: JsonSchema[] = [
     {
         title: "id",
         label: "ID",
@@ -139,6 +139,7 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
         label: "Audience",
         type: "string",
         required: true,
+        constrains: [validUri()],
         autoGenerationCapability: "init:pre",
         autoGenerate: async () => {
             return (await http.sendAndMapAs<AppConfig>("get", "/rest/app-config")).defaultAudienceUri;
@@ -188,7 +189,7 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema[] = [
     },
 ];
 
-export const IAM_USER_SCHEMA: ResourceSchema[] = [
+export const IAM_USER_SCHEMA: JsonSchema[] = [
     {
         title: "id",
         label: "ID",
@@ -248,7 +249,7 @@ export const IAM_USER_SCHEMA: ResourceSchema[] = [
     },
 ]
 
-export const IAM_POLICY_SCHEMA: ResourceSchema[] = [
+export const IAM_POLICY_SCHEMA: JsonSchema[] = [
     {
         title: "id",
         label: "ID",

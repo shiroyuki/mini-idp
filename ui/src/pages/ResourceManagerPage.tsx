@@ -11,7 +11,12 @@ import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 import styles from "./ResourceManagerPage.module.css"
 import {ErrorFeedback, GenericModel} from "../common/definitions";
-import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
+import {
+    ListRenderingOptions,
+    NormalizedItem,
+    JsonSchema,
+    PropertyToJsonSchemaMap
+} from "../common/json-schema-definitions";
 
 export type PerResourcePermission = "list" | "read" | "write" | "delete";
 export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
@@ -23,7 +28,7 @@ type ListPageProps = {
 type MainProps = {
     baseBackendUri: string;
     baseFrontendUri: string;
-    schema: ResourceSchema[];
+    schema: JsonSchema[];
     listPage: ListPageProps;
     getPermissions: PerResourcePermissionFetcher;
 }
@@ -95,7 +100,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
 type SoloProps = {
     id?: string,
     baseBackendUri: string,
-    schema: ResourceSchema[],
+    schema: JsonSchema,
     returningUri?: string,
     onCreate?: (data: GenericModel) => void,
     getPermissions: PerResourcePermissionFetcher
@@ -126,6 +131,7 @@ export const SoloResource = ({
 
     const [inFlight, setInFlight] = useState<boolean>(false);
     const [isDirty, setDirty] = useState(false);
+    const [isValid, setValid] = useState(true)s;
     const [currentMode, setCurrentMode] = useState<ResourceViewMode | undefined>(id === undefined ? "creator" : "reader");
     const [resource, setResource] = useState<any | undefined>(undefined);
     const permissions = useMemo(
@@ -170,15 +176,14 @@ export const SoloResource = ({
             if (!resource) {
                 return [{error: "not_found"}];
             }
-
-            const patch = schema
-                .filter(field => !field.readOnly && !field.hidden)
-                .map(field => {
+            const patch = Object.entries(schema.properties as PropertyToJsonSchemaMap)
+                .filter((fieldName, fieldSchema) => !fieldSchema.readOnly && !fieldSchema.hidden)
+                .map((fieldName, fieldSchema) => {
                     return {
                         op: "replace",
-                        path: "/" + field.title,
+                        path: "/" + fieldName,
                         // @ts-ignore
-                        value: resource[field.title],
+                        value: resource[fieldName],
                     }
                 });
 
@@ -237,7 +242,7 @@ export const SoloResource = ({
     } else {
         return (
             <ResourceView
-                fields={schema}
+                schema={schema}
                 data={resource}
                 style={{marginBottom: "24px"}}
                 initialMode={currentMode}
@@ -253,7 +258,7 @@ export const SoloResource = ({
 type ListProps = {
     baseBackendUri: string,
     baseFrontendUri: string,
-    schema: ResourceSchema[],
+    schema: JsonSchema[],
     getPermissions: PerResourcePermissionFetcher
 }
 
@@ -298,7 +303,7 @@ const ResourceList = ({
         setCacheMap({});
 
         for (const rawField of schema) {
-            const field = rawField as ResourceSchema;
+            const field = rawField as JsonSchema;
             if (field.items && field.listRendering) {
                 const fieldListRendering = field.listRendering as ListRenderingOptions;
                 setInFlight(prevState => prevState + 1);
@@ -409,7 +414,7 @@ const ResourceList = ({
         }
     }, [cacheMap]);
 
-    const renderFieldValueAsPrimitive = useCallback((field: ResourceSchema, fieldData: any) => {
+    const renderFieldValueAsPrimitive = useCallback((field: JsonSchema, fieldData: any) => {
         const handleClick = field.isReferenceKey
             ? ((data: any) => navigate(`${baseFrontendUri}/${data}`))
             : undefined;
@@ -420,7 +425,7 @@ const ResourceList = ({
         />;
     }, [baseFrontendUri, navigate]);
 
-    const renderField = useCallback((field: ResourceSchema, resource: GenericModel) => {
+    const renderField = useCallback((field: JsonSchema, resource: GenericModel) => {
         const fieldKey = field.title as string;
         const fieldData = resource[fieldKey];
         const listRenderingOption = field.items && field.listRendering;

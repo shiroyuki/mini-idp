@@ -6,6 +6,7 @@ import Icon from "./Icon";
 import {ErrorFeedback, GenericModel} from "../common/definitions";
 import {VCheckbox} from "./VElements";
 import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
+import {ValidationResult} from "../common/validation";
 
 type FieldInputProps = {
     schema: ResourceSchema;
@@ -280,11 +281,41 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
 
 export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing" | "creator";
 
+export type FinalValidationResult = {
+    overall: ValidationResult[]; // Note: The empty list implies no issue.
+    fields: { // Note: The empty map implies no issue.
+        [fieldName: string]: ValidationResult[]; // Note: The empty list implies no issue.
+    };
+}
+
+const isFinalValidationResultOk = (result?: FinalValidationResult | null) => {
+    if (!result) {
+        return true;
+    }
+
+    if (result.overall.length > 0) {
+        return false;
+    }
+
+    if (Object.keys(result.fields).length === 0) {
+        return true;
+    }
+
+    for (const field in result.fields) {
+        if (result.fields[field].length > 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 type ResourceProp = {
     data?: GenericModel;
     fields: ResourceSchema[];
     style?: CSSProperties;
     initialMode?: ResourceViewMode;
+    finalValidationResult?: FinalValidationResult | null; // If this is null or undefined, it is considered "valid".
     isDirty?: () => boolean;
     onCancel?: () => void;
     onSubmit?: () => Promise<ErrorFeedback[]>;
@@ -296,6 +327,7 @@ export const ResourceView = ({
                                  data,
                                  style,
                                  initialMode,
+                                 finalValidationResult,
                                  isDirty,
                                  onUpdate,
                                  onCancel,
@@ -307,11 +339,8 @@ export const ResourceView = ({
         console.warn("The event listener for cancelling the editor mode SHOULD be defined");
     }
 
-    const handleFormSubmission = useCallback(
-        // @ts-ignore
-        async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+    const submitFormData = useCallback(
+        async () => {
             if (onSubmit) {
                 setMode("writing");
                 const errors: ErrorFeedback[] = (await onSubmit()) || [];
@@ -325,6 +354,18 @@ export const ResourceView = ({
             }
         },
         [onSubmit, setMode]
+    )
+
+    const handleFormSubmission = useCallback(
+        // @ts-ignore
+        async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (finalValidationResult) {
+                await submitFormData();
+            }
+        },
+        [submitFormData, finalValidationResult]
     );
 
     // @ts-ignore

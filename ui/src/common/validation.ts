@@ -6,7 +6,7 @@ import {ErrorFeedback} from "./definitions";
 export type ValidationResult = ErrorFeedback | null;
 export type Validator<T> = (value: T, ...options: any[]) => ValidationResult;
 
-const drainRegExpResultIterator = (iterator: { next(): { value: any, done: boolean } } extends any) => {
+const drainRegExpResultIterator = (iterator: { next(): { value: any, done: boolean, [k: string]: any } }) => {
     const collection = [];
     while (true) {
         const item = iterator.next();
@@ -66,21 +66,25 @@ export const securePassword = () => {
             reasons.push("min_length")
         }
 
+        // @ts-ignore
         let uppercaseLetterCount = drainRegExpResultIterator(value.matchAll(/[a-z]/g)).length;
         if (uppercaseLetterCount === 0) {
             reasons.push("no_uppercase_letter");
         }
 
+        // @ts-ignore
         let lowercaseLetterCount = drainRegExpResultIterator(value.matchAll(/[A-Z]/g)).length;
         if (lowercaseLetterCount === 0) {
             reasons.push("no_lowercase_letter");
         }
 
+        // @ts-ignore
         let numberCount = drainRegExpResultIterator(value.matchAll(/[0-9]/g)).length;
         if (numberCount === 0) {
             reasons.push("no_number");
         }
 
+        // @ts-ignore
         let symbolCount = drainRegExpResultIterator(value.matchAll(/[,;:=!-_.+?#@$%^&*()\[\]|{}<>/]/g)).length;
         if (symbolCount === 0) {
             reasons.push("no_symbol");

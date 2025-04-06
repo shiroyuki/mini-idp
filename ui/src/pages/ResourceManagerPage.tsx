@@ -125,7 +125,7 @@ export const SoloResource = ({
     const navigate = useNavigate();
 
     const [inFlight, setInFlight] = useState<boolean>(false);
-    const [isDirty, setDirty] = useState(false);
+    const [dirtyFields, setDirtyFields] = useState<string[]>([]);
     const [currentMode, setCurrentMode] = useState<ResourceViewMode | undefined>(id === undefined ? "creator" : "reader");
     const [resource, setResource] = useState<any | undefined>(undefined);
     const permissions = useMemo(
@@ -134,6 +134,8 @@ export const SoloResource = ({
     );
     const isReadable = useMemo(() => permissions.includes("read"), [permissions]);
     const isWritable = useMemo(() => onCreate !== undefined || permissions.includes("write"), [permissions, onCreate]);
+
+    const isResourceDirty = useCallback(() => dirtyFields.length > 0, [dirtyFields.length]);
 
     const loadResource = useCallback(() => {
         setInFlight(true);
@@ -147,13 +149,13 @@ export const SoloResource = ({
             .then(
                 (data) => {
                     setResource(data);
-                    setDirty(false);
+                    setDirtyFields([]);
                     setInFlight(false);
                 },
                 (err) => {
                     console.warn(`Encountered unexpected error: ${err}`);
                     setResource(null);
-                    setDirty(false);
+                    setDirtyFields([]);
                     setInFlight(false);
                 }
             )
@@ -187,7 +189,7 @@ export const SoloResource = ({
             try {
                 const data = await http.sendAndMapAs<any>("put", `${baseBackendUri}/${resource.id}`, makeClientOptions({json: patch}));
                 setResource(data);
-                setDirty(false);
+                setDirtyFields([]);
                 setCurrentMode("reader");
                 return [];
             } catch (error) {
@@ -206,8 +208,14 @@ export const SoloResource = ({
             updated[key] = value;
             return updated;
         })
-        setDirty(true);
-    }, [setResource, setDirty]);
+        setDirtyFields(prevState => {
+            const newState: string[] = [...prevState];
+            if (!newState.includes(key)) {
+                newState.push(key);
+            }
+            return newState;
+        });
+    }, [setResource, setDirtyFields]);
 
     const cancelEditing = useCallback(() => {
         if (currentMode === "creator") {
@@ -217,10 +225,10 @@ export const SoloResource = ({
                 throw new Error("The returning URI is not defined.");
             }
         }
-        if (isDirty) {
+        if (isResourceDirty()) {
             loadResource();
         }
-    }, [loadResource, isDirty, currentMode, returningUri, navigate]);
+    }, [loadResource, currentMode, returningUri, navigate, isResourceDirty]);
 
     useEffect(() => {
         if (id !== undefined) {
@@ -241,7 +249,7 @@ export const SoloResource = ({
                 data={resource}
                 style={{marginBottom: "24px"}}
                 initialMode={currentMode}
-                isDirty={isWritable ? () => isDirty : undefined}
+                isDirty={isWritable ? isResourceDirty : undefined}
                 onUpdate={isWritable ? updateLocalCopy : undefined}
                 onCancel={isWritable ? cancelEditing : undefined}
                 onSubmit={isWritable ? updateRemoteCopy : undefined}

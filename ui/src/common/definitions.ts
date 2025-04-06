@@ -8,5 +8,5 @@ export interface GenericModel {
 
 export interface ErrorFeedback extends GenericModel {
     error: string;
-    error_description: any; // Map to the Python version.
+    error_description?: any; // Map to the Python version.
 }

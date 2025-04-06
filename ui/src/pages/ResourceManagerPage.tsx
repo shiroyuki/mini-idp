@@ -23,7 +23,7 @@ type ListPageProps = {
 type MainProps = {
     baseBackendUri: string;
     baseFrontendUri: string;
-    schema: ResourceSchema[];
+    schema: ResourceSchema;
     listPage: ListPageProps;
     getPermissions: PerResourcePermissionFetcher;
 }
@@ -95,7 +95,7 @@ export const ResourceManagerPage: FC<MainProps> = ({
 type SoloProps = {
     id?: string,
     baseBackendUri: string,
-    schema: ResourceSchema[],
+    schema: ResourceSchema,
     returningUri?: string,
     onCreate?: (data: GenericModel) => void,
     getPermissions: PerResourcePermissionFetcher
@@ -173,14 +173,14 @@ export const SoloResource = ({
                 return [{error: "not_found"}];
             }
 
-            const patch = schema
-                .filter(field => !field.readOnly && !field.hidden)
-                .map(field => {
+            const patch = Object.entries(schema.properties as {[field: string]: ResourceSchema})
+                .filter(([_, field]) => !field.readOnly && !field.hidden)
+                .map(([fieldName, field]) => {
                     return {
                         op: "replace",
-                        path: "/" + field.title,
+                        path: "/" + fieldName,
                         // @ts-ignore
-                        value: resource[field.title],
+                        value: resource[fieldName],
                     }
                 });
 
@@ -198,7 +198,7 @@ export const SoloResource = ({
                 return [{error: "unexpected"}];
             }
         }
-    }, [resource, schema, baseBackendUri, id, onCreate]);
+    }, [resource, baseBackendUri, id, onCreate, schema.properties]);
 
     const updateLocalCopy = useCallback((key: string, value: any) => {
         // @ts-ignore
@@ -245,7 +245,7 @@ export const SoloResource = ({
     } else {
         return (
             <ResourceView
-                fields={schema}
+                schema={schema}
                 data={resource}
                 style={{marginBottom: "24px"}}
                 initialMode={currentMode}
@@ -261,7 +261,7 @@ export const SoloResource = ({
 type ListProps = {
     baseBackendUri: string,
     baseFrontendUri: string,
-    schema: ResourceSchema[],
+    schema: ResourceSchema,
     getPermissions: PerResourcePermissionFetcher
 }
 
@@ -279,9 +279,9 @@ const ResourceList = ({
     const [cacheMap, setCacheMap] = useState<{ [key: string]: any }>({});
     const [resourceList, setResourceList] = useState<GenericModel[] | undefined>(undefined);
     const [selectionList, setSelectionList] = useState<GenericModel[]>([]);
-    const primaryKeyList = schema
-        .filter(field => field.isPrimaryKey)
-        .map(field => field.title as string)
+    const primaryKeyList = Object.entries(schema.properties as {[field: string]: ResourceSchema})
+        .filter(([_, field]) => field.isPrimaryKey)
+        .map(([fieldName, _]) => fieldName)
     const selectionCollection = useMemo(
         () => new ListCollection(
             selectionList,
@@ -305,14 +305,13 @@ const ResourceList = ({
     const loadCache = useCallback(() => {
         setCacheMap({});
 
-        for (const rawField of schema) {
-            const field = rawField as ResourceSchema;
+        for (const [fieldName, field] of Object.entries(schema.properties as {[field: string]: ResourceSchema})) {
             if (field.items && field.listRendering) {
                 const fieldListRendering = field.listRendering as ListRenderingOptions;
                 setInFlight(prevState => prevState + 1);
                 fieldListRendering.load()
                     .then(availableItems => {
-                        const fieldKey = field.title as string;
+                        const fieldKey = fieldName;
                         setCacheMap(prevState => {
                             let newState: { [key: string]: any } = {};
                             newState = {...prevState};
@@ -323,7 +322,7 @@ const ResourceList = ({
                     })
             }
         }
-    }, [schema])
+    }, [schema.properties])
 
     const loadResources = useCallback(() => {
         setInFlight(prevState => prevState + 1);
@@ -602,9 +601,10 @@ const ResourceList = ({
                         />
                     </th>
                     {
-                        schema.filter(field => !field.hidden)
-                            .map(field => (
-                                <th key={`th-${field.title}`}>{field.label}</th>
+                        Object.entries(schema.properties as {[key: string]: ResourceSchema})
+                            .filter(([_, field]) => !field.hidden)
+                            .map(([fieldName, field]) => (
+                                <th key={`th-${fieldName}`}>{field.label}</th>
                             ))
                     }
                 </tr>

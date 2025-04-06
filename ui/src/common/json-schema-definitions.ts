@@ -30,7 +30,7 @@ export type ResourceSchema = {
      */
     required?: boolean;
     items?: ResourceSchema;
-    properties?: ResourceSchema[]; // FIXME This is technically a map, not a list.
+    properties?: {[field: string]: ResourceSchema}; // FIXME This is technically a map, not a list.
     ///// Custom properties /////
     label?: string;
     readOnly?: boolean;

@@ -312,7 +312,7 @@ const isFinalValidationResultOk = (result?: FinalValidationResult | null) => {
 
 type ResourceProp = {
     data?: GenericModel;
-    fields: ResourceSchema[];
+    schema: ResourceSchema;
     style?: CSSProperties;
     initialMode?: ResourceViewMode;
     finalValidationResult?: FinalValidationResult | null; // If this is null or undefined, it is considered "valid".
@@ -323,7 +323,7 @@ type ResourceProp = {
 }
 
 export const ResourceView = ({
-                                 fields,
+                                 schema,
                                  data,
                                  style,
                                  initialMode,
@@ -403,19 +403,19 @@ export const ResourceView = ({
         <form className={styles.resourceForm} style={style} onSubmit={handleFormSubmission} autoComplete="off">
             <div className={styles.controllers}>
                 {
-                    fields
-                        .filter(f => {
+                    Object.entries(schema.properties as {[key: string]: ResourceSchema})
+                        .filter(([_, f]) => {
                             if (f.autoGenerationCapability === "full:post" || f.autoGenerationCapability === "full:pre") {
                                 return false; // the fully generated field will not be editable.
                             } else if (mode === "creator") {
                                 return true; // show all fields
                             } else return !f.hidden;
                         })
-                        .map(f => (
+                        .map(([fn, f]) => (
                             <FieldInput
-                                key={f.title}
+                                key={fn}
                                 schema={f}
-                                data={(data !== undefined && data !== null) ? data[f.title as string] : undefined}
+                                data={(data !== undefined && data !== null) ? data[fn] : undefined}
                                 onUpdate={inWritingMode ? onUpdate : undefined}
                             />
                         ))

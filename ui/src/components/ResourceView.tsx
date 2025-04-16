@@ -6,7 +6,7 @@ import Icon from "./Icon";
 import {ErrorFeedback, GenericModel} from "../common/definitions";
 import {VCheckbox} from "./VElements";
 import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
-import {ValidationResult} from "../common/validation";
+import {FinalValidationResult, isFinalValidationResultOk} from "../common/validation";
 
 type FieldInputProps = {
     schema: ResourceSchema;
@@ -281,35 +281,6 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
 
 export type ResourceViewMode = "read-only" | "reader" | "editor" | "writing" | "creator";
 
-export type FinalValidationResult = {
-    overall: ValidationResult[]; // Note: The empty list implies no issue.
-    fields: { // Note: The empty map implies no issue.
-        [fieldName: string]: ValidationResult[]; // Note: The empty list implies no issue.
-    };
-}
-
-const isFinalValidationResultOk = (result?: FinalValidationResult | null) => {
-    if (!result) {
-        return true;
-    }
-
-    if (result.overall.length > 0) {
-        return false;
-    }
-
-    if (Object.keys(result.fields).length === 0) {
-        return true;
-    }
-
-    for (const field in result.fields) {
-        if (result.fields[field].length > 0) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 type ResourceProp = {
     data?: GenericModel;
     schema: ResourceSchema;
@@ -317,6 +288,7 @@ type ResourceProp = {
     initialMode?: ResourceViewMode;
     finalValidationResult?: FinalValidationResult | null; // If this is null or undefined, it is considered "valid".
     isDirty?: () => boolean;
+    switchToMode: (mode: ResourceViewMode) => void;
     onCancel?: () => void;
     onSubmit?: () => Promise<ErrorFeedback[]>;
     onUpdate?: (key: string, value: any) => any;
@@ -329,11 +301,11 @@ export const ResourceView = ({
                                  initialMode,
                                  finalValidationResult,
                                  isDirty,
+                                 switchToMode,
                                  onUpdate,
                                  onCancel,
                                  onSubmit
                              }: ResourceProp) => {
-    const [mode, setMode] = React.useState<ResourceViewMode | undefined>(initialMode || "reader");
 
     if (onUpdate && !onCancel) {
         console.warn("The event listener for cancelling the editor mode SHOULD be defined");
@@ -342,18 +314,18 @@ export const ResourceView = ({
     const submitFormData = useCallback(
         async () => {
             if (onSubmit) {
-                setMode("writing");
+                switchToMode("writing");
                 const errors: ErrorFeedback[] = (await onSubmit()) || [];
                 if (errors.length === 0) {
-                    setMode("reader");
+                    switchToMode("reader");
                 } else {
-                    setMode("editor");
+                    switchToMode("editor");
                     // TODO: Implement the form error feedback.
                     console.log(errors);
                 }
             }
         },
-        [onSubmit, setMode]
+        [onSubmit, switchToMode]
     )
 
     const handleFormSubmission = useCallback(
@@ -361,8 +333,11 @@ export const ResourceView = ({
         async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (finalValidationResult) {
+            if (isFinalValidationResultOk(finalValidationResult)) {
+                console.log("A");
                 await submitFormData();
+            } else {
+                console.warn("Form submission blocked due to", finalValidationResult);
             }
         },
         [submitFormData, finalValidationResult]
@@ -372,30 +347,30 @@ export const ResourceView = ({
     const startEditing = useCallback((e) => {
         e.preventDefault();
         e.stopPropagation();
-        setMode("editor");
-    }, [setMode]);
+        switchToMode("editor");
+    }, [switchToMode]);
 
     const abortEditing = useCallback(() => {
         const cleanCancellation = isDirty && !isDirty();
 
-        if (mode === "creator") {
+        if (initialMode === "creator") {
             if (confirm("Are you sure you want to discard all changes?")) {
                 if (onCancel) onCancel();
                 else alert("The cancellation of creation is not implemented.");
             }
         } else {
             if (cleanCancellation || confirm("Are you sure you want to discard all changes?")) {
-                setMode("reader");
+                switchToMode("reader");
                 if (onCancel) onCancel();
             }
         }
-    }, [onCancel, setMode, isDirty, mode]);
+    }, [onCancel, switchToMode, isDirty, initialMode]);
 
-    const inWritingMode = mode === "editor" || mode === "creator";
-    const showActions = (mode === "reader" || inWritingMode) && onUpdate !== undefined;
+    const inWritingMode = initialMode === "editor" || initialMode === "creator";
+    const showActions = (initialMode === "reader" || inWritingMode) && onUpdate !== undefined;
     const cancelLabel = (isDirty && isDirty()) ? "Discard changes" : "Stop editing";
 
-    if (mode === "writing") {
+    if (initialMode === "writing") {
         return <LinearLoadingAnimation label={"Please wait..."}/>;
     }
 
@@ -407,7 +382,7 @@ export const ResourceView = ({
                         .filter(([_, f]) => {
                             if (f.autoGenerationCapability === "full:post" || f.autoGenerationCapability === "full:pre") {
                                 return false; // the fully generated field will not be editable.
-                            } else if (mode === "creator") {
+                            } else if (initialMode === "creator") {
                                 return true; // show all fields
                             } else return !f.hidden;
                         })
@@ -425,7 +400,7 @@ export const ResourceView = ({
                 showActions && (
                     <div className={styles.actions}>
                         {
-                            mode === "reader"
+                            initialMode === "reader"
                                 ? (
                                     <>
                                         <button type={"button"} onClick={startEditing}>Edit</button>
@@ -433,9 +408,14 @@ export const ResourceView = ({
                                 )
                                 : (
                                     <>
-                                        <button type={"submit"}>{mode === "editor" ? "Save" : "Create"}</button>
-                                        {data && <button type={"reset"} onClick={abortEditing}
-                                                         title={cancelLabel}>{cancelLabel}</button>}
+                                        <button type={"submit"}>
+                                            {initialMode === "editor" ? "Save" : "Create"}
+                                        </button>
+                                        <button type={"reset"}
+                                                onClick={abortEditing}
+                                                title={cancelLabel}>
+                                            {initialMode === "editor" ? cancelLabel : "Cancel"}
+                                        </button>
                                     </>
                                 )
                         }

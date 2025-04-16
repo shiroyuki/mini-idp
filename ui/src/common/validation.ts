@@ -19,11 +19,21 @@ const drainRegExpResultIterator = (iterator: { next(): { value: any, done: boole
     return collection;
 }
 
-export const validAlternativeId = (minCharacters?: number, maxCharacters?: number) => {
+export const validAlternativeId = (minLength?: number, maxLength?: number) => {
     return (value: string): ValidationResult => {
-        if (!value.match(/^[a-zA-Z][a-zA-Z0-9\-_.]+[a-zA-Z0-9]$/)) {
+        if (minLength && minLength > value.length) {
             return {
-                error: "invalid_alternative_id.pattern",
+                error: 'id.too_short',
+                error_description: `Must be at least ${minLength} characters`,
+            }
+        } else if (maxLength && value.length > maxLength) {
+            return {
+                error: 'id.too_short',
+                error_description: `Must be at least ${maxLength} characters`,
+            }
+        } else if (!value.match(/^[a-zA-Z][a-zA-Z0-9\-_.]+[a-zA-Z0-9]$/)) {
+            return {
+                error: "id.invalid_pattern",
                 error_description: "Must start and end with characters (A-Z). Anything else in between can be alphanumerics (characters and numbers), dashes, underscores, and dots.",
             }
         } else {
@@ -163,4 +173,33 @@ export const mustBeEmailAddress = (): Validator<string>[] => {
         minimumSizeOf(8),
         validEmailAddress(),
     ]
+}
+
+export type FinalValidationResult = {
+    overall: ValidationResult[]; // Note: The empty list implies no issue.
+    fields: { // Note: The empty map implies no issue.
+        [fieldName: string]: ValidationResult[]; // Note: The empty list implies no issue.
+    };
+}
+
+export const isFinalValidationResultOk = (result?: FinalValidationResult | null) => {
+    if (!result) {
+        return true;
+    }
+
+    if (result.overall.length > 0) {
+        return false;
+    }
+
+    if (Object.keys(result.fields).length === 0) {
+        return true;
+    }
+
+    for (const field in result.fields) {
+        if (result.fields[field].length > 0) {
+            return false;
+        }
+    }
+
+    return true;
 }

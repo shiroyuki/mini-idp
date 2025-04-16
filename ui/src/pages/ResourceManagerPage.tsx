@@ -427,8 +427,8 @@ const ResourceList = ({
         />;
     }, [baseFrontendUri, navigate]);
 
-    const renderField = useCallback((field: ResourceSchema, resource: GenericModel) => {
-        const fieldKey = field.title as string;
+    const renderField = useCallback((fieldName: string, field: ResourceSchema, resource: GenericModel) => {
+        const fieldKey = fieldName;
         const fieldData = resource[fieldKey];
         const listRenderingOption = field.items && field.listRendering;
 
@@ -443,18 +443,18 @@ const ResourceList = ({
         );
     }, [renderFieldValueAsList, renderFieldValueAsPrimitive]);
 
-    const renderResource = useCallback((resource: GenericModel) => {
-        const selectable = getPermissions(resource).includes("delete");
+    const renderObjectRow = useCallback((rowEntry: GenericModel) => {
+        const selectable = getPermissions(rowEntry).includes("delete");
         return (
-            <tr key={schema[0].title}>
+            <tr>
                 <td className={classNames(["data-table-row-selector", selectable ? "selectable" : "non-selectable"])}>
                     {
                         selectable
                             ? (
                                 <VCheckbox
                                     disabled={dataTableControllerMode !== "navigator"}
-                                    checked={selectionCollection.contains(resource)}
-                                    value={resource}
+                                    checked={selectionCollection.contains(rowEntry)}
+                                    value={rowEntry}
                                     onClick={toggleSelection}
                                     onKeyUp={toggleSelection}
                                 />
@@ -463,12 +463,13 @@ const ResourceList = ({
                     }
                 </td>
                 {
-                    schema.filter(field => !field.hidden)
-                        .map(field => renderField(field, resource))
+                    Object.entries(schema.properties as {[field: string]: ResourceSchema})
+                        .filter(([fieldName, field]) => !field.hidden)
+                        .map(([fieldName, field]) => renderField(fieldName, field, rowEntry))
                 }
             </tr>
         );
-    }, [getPermissions, schema, dataTableControllerMode, selectionCollection, toggleSelection, renderField]);
+    }, [getPermissions, dataTableControllerMode, selectionCollection, toggleSelection, renderField, schema.properties]);
 
     const writableResourceCount = useMemo(
         () => resourceList === undefined
@@ -612,7 +613,7 @@ const ResourceList = ({
                 {
                     // Data Table Body
                 }
-                <tbody>{resourceList.map(renderResource)}</tbody>
+                <tbody>{resourceList.map(renderObjectRow)}</tbody>
             </table>
         </div>
     );

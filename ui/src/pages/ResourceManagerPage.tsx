@@ -249,6 +249,7 @@ export const SoloResource = ({
                 data={resource}
                 style={{marginBottom: "24px"}}
                 initialMode={currentMode}
+                switchToMode={setCurrentMode}
                 isDirty={isWritable ? isResourceDirty : undefined}
                 onUpdate={isWritable ? updateLocalCopy : undefined}
                 onCancel={isWritable ? cancelEditing : undefined}

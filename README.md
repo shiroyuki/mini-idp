@@ -51,7 +51,13 @@ The Mini Identity Provider for Local Development and Testing
      ```
   4. Activate the environment with:
      ```shell
+     # poetry 1.8
      poetry shell
+     ```
+     or
+     ```shell
+     # poetry 2.1
+     $(poetry env activate)
      ```
 
 #### Production Environment

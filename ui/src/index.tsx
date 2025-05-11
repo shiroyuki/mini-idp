@@ -182,6 +182,10 @@ const router = createHashRouter([
         ),
         children: [
             {
+                path: '',
+                element: <FrontPage/>,
+            },
+            {
                 path: 'login',
                 element: <LoginComponent/>,
             },
@@ -245,11 +249,6 @@ const router = createHashRouter([
                 path: 'account/profile',
                 // @ts-ignore
                 element: <MyProfilePage/>,
-            },
-            {
-                path: '',
-                // @ts-ignore
-                element: <FrontPage/>,
             },
         ]
     },

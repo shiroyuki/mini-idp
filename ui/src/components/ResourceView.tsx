@@ -29,11 +29,22 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
         return <div className={"value-placeholder"}>null</div>;
     }
 
+    // TODO Instead of guessing the data type, request for the schema.
     const dataType = typeof data;
     let renderedValue: any;
 
+    // @ts-ignore
+    const handleClickOnContent = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (onClick) {
+            onClick(data);
+        }
+    }, [onClick]);
+
     if (dataType === "object") {
-        // TODO Handle recursion
+        // TODO Currently, this part only handles one level-depth object.
         return (
             <table className={styles.dataBlockObject}>
                 <tbody>
@@ -43,7 +54,7 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
                             return (
                                 <tr key={key}>
                                     <th>{key}</th>
-                                    <td><DataBlock data={data[key]}/></td>
+                                    <td><DataBlock data={data[key]} onClick={onClick}/></td>
                                 </tr>
                             )
                         })
@@ -65,12 +76,10 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
         }
 
         if (onClick) {
-            return <a className={styles.dataBlockReferenceLink} onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                onClick(data);
-            }}>{renderedValue}</a>;
+            return (
+                <a className={styles.dataBlockReferenceLink}
+                   onClick={handleClickOnContent}>{renderedValue}</a>
+            );
         } else {
             return renderedValue;
         }
@@ -78,6 +87,8 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
 }
 
 const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
+    const minimumShownItemLength = 3;
+    const [minimal, setMinimal] = useState<boolean>(true);
     const isSensitiveField = schema.sensitive;
     const [showSecret, setShowSecret] = useState<boolean>(!isSensitiveField);
 
@@ -122,7 +133,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
     }, [schema, data, onUpdate]);
 
     const updateList = useCallback(
-        (key: string, value: any, checked: boolean) => {
+        (_: string, value: any, checked: boolean) => {
             if (!onUpdate) {
                 return; // NOOP
             }
@@ -153,6 +164,13 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
         }
     }
 
+    // @ts-ignore
+    const handleListMinimalism = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMinimal(prev => !prev);
+    }
+
     if (isRenderingList) {
         if (listState === undefined) {
             return <LinearLoadingAnimation label={"Please wait..."}/>;
@@ -169,6 +187,7 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
 
                 const listData = listState.data as any[];
                 const filteredList = listData
+                    .slice(0, minimal ? minimumShownItemLength : listData.length)
                     .map(item => listRenderingOption.normalize(data, item) as NormalizedItem<any>)
                     .filter(item => {
                         return (listRenderingOption.list === "selected-only" && item.checked)
@@ -217,6 +236,9 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                                     })
                             }
                         </ul>
+                        { listData.length > minimumShownItemLength ?? (
+                            <button onClick={handleListMinimalism}>{minimal ? "Show more" : "Show less"}</button>
+                        ) }
                     </div>
                 );
             }
@@ -378,7 +400,7 @@ export const ResourceView = ({
         <form className={styles.resourceForm} style={style} onSubmit={handleFormSubmission} autoComplete="off">
             <div className={styles.controllers}>
                 {
-                    Object.entries(schema.properties as {[key: string]: ResourceSchema})
+                    Object.entries(schema.properties as { [key: string]: ResourceSchema })
                         .filter(([_, f]) => {
                             if (f.autoGenerationCapability === "full:post" || f.autoGenerationCapability === "full:pre") {
                                 return false; // the fully generated field will not be editable.

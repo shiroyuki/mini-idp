@@ -1,9 +1,10 @@
-import {Outlet, useLocation} from 'react-router-dom';
+import {Outlet, useLocation, useNavigate} from 'react-router-dom';
 import './App.scss';
 import {useCallback, useEffect, useState} from "react";
 import {AppState, BootingState, convertToResponseInfo, ResponseInfo} from "./common/app-state";
 import {LinearLoadingAnimation} from "./components/loaders";
 import {ejectToLoginScreen} from "./common/helpers";
+import {useComputed} from "@headlessui/react/dist/hooks/use-computed";
 
 const FEATURE_PERIODIC_SESSION_CHECK = false;
 
@@ -28,6 +29,9 @@ const runSessionValidation = () => {
 }
 
 function App() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const currentRoute = location.pathname;
     const [periodicSessionVerificationTaskRef, setPeriodicSessionVerificationTaskRef] = useState<any>(null); // TODO replace with useRef.
     const [currentAppState, setCurrentAppState] = useState<AppState>({
         status: "idle",
@@ -65,6 +69,10 @@ function App() {
                         } else if (response.status === 401) {
                             if (currentAppState.status !== "login-required") {
                                 newStatus = "login-required";
+
+                                if (currentRoute !== '/login') {
+                                    navigate('/login');
+                                }
                             }
                         } else {
                             newStatus = "error";

@@ -14,11 +14,11 @@ from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMScope, IAMUser, IAMPolicy, IAMPolicySubject, PredefinedRole, \
     PredefinedScope, PredefinedPolicy
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from midp.rds import DataStore, DataStoreSession
 from midp.snapshot.models import AppSnapshot
 
-log = get_logger_for("snapshot.utils")
+log = midp_logger("snapshot.utils")
 
 
 def restore_from_snapshot(main_config: AppSnapshot, session: Optional[DataStoreSession] = None):

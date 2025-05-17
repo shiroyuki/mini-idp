@@ -1,18 +1,16 @@
 import logging
 import os
 
-from imagination.debug import get_logger
+from imagination.debug import get_logger, get_logger_for
 
 
 def get_log_level():
     return getattr(logging, (os.getenv('MIDP_LOG_LEVEL') or 'INFO').upper())
 
 
-def get_logger_for(name: str) -> logging.Logger:
-    log_level = get_log_level()
-    return get_logger(name, log_level)
+def midp_logger(name: str) -> logging.Logger:
+    return get_logger(name, get_log_level())
 
 
-def get_logger_for_object(reference_obj: object) -> logging.Logger:
-    cls = type(reference_obj)
-    return get_logger_for(f'{cls.__module__}.{cls.__name__}')
+def midp_logger_for(reference_obj: object) -> logging.Logger:
+    return get_logger_for(reference_obj, get_log_level())

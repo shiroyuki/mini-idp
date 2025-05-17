@@ -4,10 +4,10 @@ from imagination import container
 
 from midp.common.debugging import measure_method_runtime
 from midp.common.enigma import Enigma
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from tests.common.base_feature import GenericDeferrableFeature
 
-LOG = get_logger_for('tests.common.enigma')
+LOG = midp_logger('tests.common.enigma')
 
 
 class E2ETest(GenericDeferrableFeature, TestCase):

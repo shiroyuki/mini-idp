@@ -4,7 +4,7 @@ import {Navigation, UIFoundationHeader} from "../components/UIFoundationHeader";
 import {ClientOptions, http} from "../common/http-client";
 import classNames from "classnames";
 import {LinearLoadingAnimation} from "../components/loaders";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {Link, useNavigate, useNavigation, useParams, useResolvedPath} from "react-router-dom";
 import {DataBlock, ResourceView, ResourceViewMode} from "../components/ResourceView";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
@@ -173,7 +173,7 @@ export const SoloResource = ({
                 return [{error: "not_found"}];
             }
 
-            const patch = Object.entries(schema.properties as {[field: string]: ResourceSchema})
+            const patch = Object.entries(schema.properties as { [field: string]: ResourceSchema })
                 .filter(([_, field]) => !field.readOnly && !field.hidden)
                 .map(([fieldName, field]) => {
                     return {
@@ -259,6 +259,81 @@ export const SoloResource = ({
     }
 }
 
+type FieldValueListProps = {
+    allResources: any[];
+    listRenderingOption: ListRenderingOptions;
+    selectedItems: any[];
+};
+
+const FieldValueList = ({allResources, listRenderingOption, selectedItems}: FieldValueListProps) => {
+    const minimalListSize = 5;
+    const [minimal, setMinimal] = useState<boolean>(true);
+
+    const filteredList = allResources
+        .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
+        .map(loadedItem => listRenderingOption.normalize(selectedItems, loadedItem) as NormalizedItem<any>)
+        .filter(loadedItem => loadedItem.checked);
+    const displayedList = minimal ? filteredList.slice(0, minimalListSize) : filteredList;
+
+    // @ts-ignore
+    const toggleDisplaySize = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setMinimal(prev => !prev);
+    }
+
+    const showLess = useMemo(() => displayedList.length === filteredList.length, [displayedList, filteredList]);
+
+    // TODO Handled structured data with DataBlock
+
+    return (
+        <>
+            <ul data-count={filteredList.length} data-display-limit={minimalListSize}>
+                {
+                    displayedList
+                        .map(item => (
+                            <li key={item.value}
+                                className={classNames([item.checked ? "selected" : "not-selected"])}>
+                                {item.label ?? <DataBlock data={item.value}/>}
+                            </li>
+                        ))
+                }
+            </ul>
+            {
+                filteredList.length > minimalListSize &&
+                (
+                    <a onClick={toggleDisplaySize} className={styles.toggleLessMoreList}>
+                        <span>{showLess ? "↑" : "↓"}</span>
+                        <span>Show {showLess ? "less" : "more"}</span>
+                    </a>
+                )
+            }
+        </>
+    );
+}
+
+type FieldValuePrimitiveProps = {
+    baseFrontendUri: string;
+    field: ResourceSchema;
+    data: any;
+};
+
+const FieldValuePrimitive = ({baseFrontendUri, field, data}: FieldValuePrimitiveProps) => {
+    const navigate = useNavigate();
+    const href = field.isReferenceKey ? `#${baseFrontendUri}/${data}` : undefined;
+    const handleClick = field.isReferenceKey
+        ? ((data: any) => navigate(`${baseFrontendUri}/${data}`))
+        : undefined;
+
+    return (
+        <DataBlock
+            data={data}
+            href={href}
+            onClick={handleClick}
+        />
+    );
+}
+
 type ListProps = {
     baseBackendUri: string,
     baseFrontendUri: string,
@@ -280,7 +355,7 @@ const ResourceList = ({
     const [cacheMap, setCacheMap] = useState<{ [key: string]: any }>({});
     const [resourceList, setResourceList] = useState<GenericModel[] | undefined>(undefined);
     const [selectionList, setSelectionList] = useState<GenericModel[]>([]);
-    const primaryKeyList = Object.entries(schema.properties as {[field: string]: ResourceSchema})
+    const primaryKeyList = Object.entries(schema.properties as { [field: string]: ResourceSchema })
         .filter(([_, field]) => field.isPrimaryKey)
         .map(([fieldName, _]) => fieldName)
     const selectionCollection = useMemo(
@@ -306,7 +381,7 @@ const ResourceList = ({
     const loadCache = useCallback(() => {
         setCacheMap({});
 
-        for (const [fieldName, field] of Object.entries(schema.properties as {[field: string]: ResourceSchema})) {
+        for (const [fieldName, field] of Object.entries(schema.properties as { [field: string]: ResourceSchema })) {
             if (field.items && field.listRendering) {
                 const fieldListRendering = field.listRendering as ListRenderingOptions;
                 setInFlight(prevState => prevState + 1);
@@ -380,69 +455,32 @@ const ResourceList = ({
             setDataTableControllerMode("deletion:init");
         },
         [setDataTableControllerMode]
-    )
-
-    const renderValueWithoutSchema = useCallback((data: any) => {
-        const dataType = typeof data;
-
-        switch (dataType) {
-            case "string":
-            case "number":
-                return data;
-            case "boolean":
-        }
-    }, [])
-
-    const renderFieldValueAsList = useCallback((fieldKey: string, fieldData: any[], listRenderingOption: ListRenderingOptions) => {
-        if (cacheMap[fieldKey] === undefined) {
-            console.log(`No cache map for ${fieldKey}`);
-            return <LinearLoadingAnimation/>;
-        } else {
-            const filteredList = (cacheMap[fieldKey] as any[])
-                .filter(loadedItem => loadedItem !== undefined && loadedItem !== null)
-                .map(loadedItem => listRenderingOption.normalize(fieldData, loadedItem) as NormalizedItem<any>)
-                .filter(loadedItem => loadedItem.checked);
-            // TODO Handled structured data with DataBlock
-            return <ul data-count={filteredList.length}>
-                {
-                    filteredList
-                        .map(item => (
-                            <li key={item.value}
-                                className={classNames([item.checked ? "selected" : "not-selected"])}>
-                                {item.label ?? <DataBlock data={item.value} />}
-                            </li>
-                        ))
-                }
-            </ul>;
-        }
-    }, [cacheMap]);
-
-    const renderFieldValueAsPrimitive = useCallback((field: ResourceSchema, fieldData: any) => {
-        const handleClick = field.isReferenceKey
-            ? ((data: any) => navigate(`${baseFrontendUri}/${data}`))
-            : undefined;
-
-        return <DataBlock
-            data={fieldData}
-            onClick={handleClick}
-        />;
-    }, [baseFrontendUri, navigate]);
+    );
 
     const renderField = useCallback((fieldName: string, field: ResourceSchema, resource: GenericModel) => {
         const fieldKey = fieldName;
         const fieldData = resource[fieldKey];
         const listRenderingOption = field.items && field.listRendering;
+        const classNameList = classNames([`data-table-field-type-${field.items ? "list" : field.type}`]);
 
-        return (
-            <>
-                <td className={classNames([`data-table-field-type-${field.items ? "list" : field.type}`])}>{
-                    listRenderingOption !== undefined
-                        ? renderFieldValueAsList(fieldKey, fieldData, listRenderingOption as ListRenderingOptions)
-                        : renderFieldValueAsPrimitive(field, fieldData)
-                }</td>
-            </>
-        );
-    }, [renderFieldValueAsList, renderFieldValueAsPrimitive]);
+        if (listRenderingOption !== undefined && cacheMap[fieldKey] === undefined) {
+            return <td className={classNameList}><LinearLoadingAnimation/></td>;
+        } else {
+            return (
+                <>
+                    <td className={classNameList}>{
+                        listRenderingOption !== undefined
+                            ? <FieldValueList allResources={cacheMap[fieldKey] as any[]}
+                                              listRenderingOption={listRenderingOption}
+                                              selectedItems={fieldData}/>
+                            : <FieldValuePrimitive baseFrontendUri={baseFrontendUri}
+                                                   field={field}
+                                                   data={fieldData}/>
+                    }</td>
+                </>
+            );
+        }
+    }, [cacheMap]);
 
     const renderObjectRow = useCallback((rowEntry: GenericModel) => {
         const selectable = getPermissions(rowEntry).includes("delete");
@@ -464,7 +502,7 @@ const ResourceList = ({
                     }
                 </td>
                 {
-                    Object.entries(schema.properties as {[field: string]: ResourceSchema})
+                    Object.entries(schema.properties as { [field: string]: ResourceSchema })
                         .filter(([fieldName, field]) => !field.hidden)
                         .map(([fieldName, field]) => renderField(fieldName, field, rowEntry))
                 }
@@ -603,7 +641,7 @@ const ResourceList = ({
                         />
                     </th>
                     {
-                        Object.entries(schema.properties as {[key: string]: ResourceSchema})
+                        Object.entries(schema.properties as { [key: string]: ResourceSchema })
                             .filter(([_, field]) => !field.hidden)
                             .map(([fieldName, field]) => (
                                 <th key={`th-${fieldName}`}>{field.label}</th>

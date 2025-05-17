@@ -21,10 +21,11 @@ type ListState = {
 
 type DataBlockProps = {
     data: any;
+    href?: string;
     onClick?: (data: any) => void;
 }
 
-export const DataBlock = ({data, onClick}: DataBlockProps) => {
+export const DataBlock = ({data, href, onClick}: DataBlockProps) => {
     if (data === undefined || data === null) {
         return <div className={"value-placeholder"}>null</div>;
     }
@@ -78,6 +79,7 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
         if (onClick) {
             return (
                 <a className={styles.dataBlockReferenceLink}
+                   href={href}
                    onClick={handleClickOnContent}>{renderedValue}</a>
             );
         } else {
@@ -87,8 +89,6 @@ export const DataBlock = ({data, onClick}: DataBlockProps) => {
 }
 
 const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
-    const minimumShownItemLength = 3;
-    const [minimal, setMinimal] = useState<boolean>(true);
     const isSensitiveField = schema.sensitive;
     const [showSecret, setShowSecret] = useState<boolean>(!isSensitiveField);
 
@@ -164,13 +164,6 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
         }
     }
 
-    // @ts-ignore
-    const handleListMinimalism = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setMinimal(prev => !prev);
-    }
-
     if (isRenderingList) {
         if (listState === undefined) {
             return <LinearLoadingAnimation label={"Please wait..."}/>;
@@ -187,7 +180,6 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
 
                 const listData = listState.data as any[];
                 const filteredList = listData
-                    .slice(0, minimal ? minimumShownItemLength : listData.length)
                     .map(item => listRenderingOption.normalize(data, item) as NormalizedItem<any>)
                     .filter(item => {
                         return (listRenderingOption.list === "selected-only" && item.checked)
@@ -236,9 +228,6 @@ const FieldInput = ({schema, data, onUpdate}: FieldInputProps) => {
                                     })
                             }
                         </ul>
-                        { listData.length > minimumShownItemLength ?? (
-                            <button onClick={handleListMinimalism}>{minimal ? "Show more" : "Show less"}</button>
-                        ) }
                     </div>
                 );
             }

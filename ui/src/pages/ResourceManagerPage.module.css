@@ -1,3 +1,19 @@
 .localDataTable {
     margin: -24px -24px 0 -24px;
 }
+
+.toggleLessMoreList {
+    display: inline-flex;
+    color: var(--colourPrimary);
+    cursor: pointer;
+    margin-top: 4px;
+
+    & > span {
+        display: block;
+        margin-right: 4px;
+    }
+
+    & > span:last-child {
+        margin-right: 0;
+    }
+}

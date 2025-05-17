@@ -187,7 +187,7 @@ export const IAM_OAUTH_CLIENT_SCHEMA: ResourceSchema = {
             },
             listRendering: {
                 list: "all",
-                load: listItemsFrom<IAMScope>("/rest/scopes/"),
+                load: listItemsFrom<IAMScope>("/rest/iam/scopes/"),
                 normalize: createSimpleOptionFromObject<IAMScope, string>("name", "description"),
             }
         },
@@ -249,7 +249,7 @@ export const IAM_USER_SCHEMA: ResourceSchema = {
             },
             listRendering: {
                 list: "all",
-                load: listItemsFrom<IAMRole>("/rest/roles/"),
+                load: listItemsFrom<IAMRole>("/rest/iam/roles/"),
                 normalize: createSimpleOptionFromObject<IAMRole, string>("name", "description"),
             }
         },
@@ -315,15 +315,15 @@ export const IAM_POLICY_SCHEMA: ResourceSchema = {
                 load: async () => {
                     const subjects: IAMPolicySubject[] = [];
 
-                    for (let client of (await sendListRequestTo<IAMOAuthClient>("/rest/clients/"))) {
+                    for (let client of (await sendListRequestTo<IAMOAuthClient>("/rest/iam/clients/"))) {
                         subjects.push({subject: client.name, kind: "client"});
                     }
 
-                    for (let client of (await sendListRequestTo<IAMOAuthClient>("/rest/roles/"))) {
+                    for (let client of (await sendListRequestTo<IAMOAuthClient>("/rest/iam/roles/"))) {
                         subjects.push({subject: client.name, kind: "role"});
                     }
 
-                    for (let user of (await sendListRequestTo<IAMUser>("/rest/users/"))) {
+                    for (let user of (await sendListRequestTo<IAMUser>("/rest/iam/users/"))) {
                         subjects.push({subject: user.name, kind: "user"});
                     }
 
@@ -343,7 +343,7 @@ export const IAM_POLICY_SCHEMA: ResourceSchema = {
             },
             listRendering: {
                 list: "all",
-                load: listItemsFrom<IAMScope>("/rest/scopes/"),
+                load: listItemsFrom<IAMScope>("/rest/iam/scopes/"),
                 normalize: createSimpleOptionFromObject<IAMScope, string>("name", "description"),
             }
         },

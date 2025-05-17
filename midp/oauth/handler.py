@@ -19,7 +19,7 @@ from midp.common.session_manager import Session
 from midp.common.token_manager import TokenManager, TokenSet, TokenGenerationError
 from midp.common.web_helpers import restore_session
 from midp.iam.models import PredefinedScope, IAMPolicySubject, GrantType
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from midp.oauth.access_evaluator import ClientAuthenticator, ClientAuthenticationError
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, \
     DeviceAuthorizationRequest, DeviceAuthorizationResponse, LoginResponse
@@ -207,7 +207,7 @@ async def exchange_token(data: Annotated[TokenExchangeRequest, Form()],
                          response: Response) -> TokenExchangeResponse:
     # Based on https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow
 
-    log = get_logger_for('/oauth/token')
+    log = midp_logger('/oauth/token')
 
     access_evaluator: ClientAuthenticator = container.get(ClientAuthenticator)
     token_manager: TokenManager = container.get(TokenManager)
@@ -292,7 +292,7 @@ async def confirm_for_device_activation(request: Request,
                                         session: Annotated[Session, Depends(restore_session)],
                                         data: DeviceAuthorizationRequest,
                                         response: Response):
-    log = get_logger_for('initiate_device_authorization')
+    log = midp_logger('initiate_device_authorization')
 
     json_activation = request.headers.get('accept') == 'application/json'
 

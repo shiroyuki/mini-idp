@@ -1,12 +1,12 @@
 from contextlib import contextmanager
 from time import time
 
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 
 
 @contextmanager
 def measure_runtime(label: str, *, enabled: bool = True):
-    log = get_logger_for('runtime_watch')
+    log = midp_logger('runtime_watch')
     starting_time = time()
     yield
     log.warning(f'{label} // Finished in {time() - starting_time:.6f}s')

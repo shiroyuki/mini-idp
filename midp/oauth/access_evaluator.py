@@ -5,7 +5,7 @@ from imagination.decorator.service import Service
 
 from midp.iam.dao.client import ClientDao
 from midp.iam.models import IAMOAuthClient, GrantType
-from midp.log_factory import get_logger_for_object
+from midp.log_factory import midp_logger_for
 
 
 class ClientAuthenticationError(RuntimeError):
@@ -20,7 +20,7 @@ class ClientAuthenticationError(RuntimeError):
 @Service()
 class ClientAuthenticator:
     def __init__(self, client_dao: ClientDao):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
         self._client_dao = client_dao
 
     async def authenticate(self,

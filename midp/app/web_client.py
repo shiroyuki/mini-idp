@@ -16,11 +16,11 @@ from midp.common.enigma import Enigma
 from midp.common.env_helpers import optional_env
 from midp.common.obj_patcher import PatchOperation
 from midp.iam.models import PredefinedScope, IAMScope, IAMOAuthClient, IAMPolicy, IAMRole, IAMUser, GrantType
-from midp.log_factory import get_logger_for, get_logger_for_object
+from midp.log_factory import midp_logger, midp_logger_for
 from midp.oauth.models import DeviceVerificationCodeResponse, TokenExchangeResponse, OpenIDConfiguration
 from midp.snapshot.models import AppSnapshot
 
-mod_log = get_logger_for('midp.app.web_client')
+mod_log = midp_logger('midp.app.web_client')
 T = TypeVar('T')
 
 
@@ -52,7 +52,7 @@ _DEFAULT_CONTEXT_NAME = 'default'
 @Service()
 class WebClientLocalStorageManager:
     def __init__(self, storage_dir: Optional[str] = None):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
         self._enigma = Enigma()
         self._storage_dir = storage_dir or optional_env('MINI_IDP_CLIENT_STORAGE_DIR', str(Path.home() / ".mini_idp"))
         self._config_file_path = os.path.join(self._storage_dir, 'client.json')
@@ -175,7 +175,7 @@ class RestAPIClient(Generic[T]):
                  resource_url: Optional[str],
                  model_class: Type[T],
                  local_storage_manager: WebClientLocalStorageManager):
-        self._log = get_logger_for(f'REST:{model_class.__name__}')
+        self._log = midp_logger(f'REST:{model_class.__name__}')
         self._root_url = root_url
         self._base_url = base_url
         self._resource_url = resource_url
@@ -291,7 +291,7 @@ class MiniIDP:
                  output: Optional[ClientOutput] = None,
                  local_storage_manager: Optional[WebClientLocalStorageManager] = None,
                  resource_url: Optional[str] = None):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
         self._enigma = Enigma()
         self._base_url = base_url.strip()
         self._resource_url = resource_url

@@ -4,7 +4,7 @@ from typing import Generic, TypeVar, Any, Dict, Optional, Generator, Callable, L
 
 from pydantic import BaseModel
 
-from midp.log_factory import get_logger_for, get_logger_for_object
+from midp.log_factory import midp_logger, midp_logger_for
 from midp.rds import DataStore, DataStoreSession
 
 T = TypeVar('T')
@@ -49,7 +49,7 @@ class _ColumnMapping(BaseModel):
 
 class AtomicDao(Generic[T]):
     def __init__(self, datastore: DataStore, model_class: Type[T], table_name: str):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
 
         self._datastore = datastore
         self._model_class = model_class

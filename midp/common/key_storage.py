@@ -8,7 +8,7 @@ from imagination.decorator.service import Service
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from midp.rds import DataStore
 
 
@@ -21,7 +21,7 @@ class Entry(BaseModel):
 @Service()
 class KeyStorage(ABC):
     def __init__(self, datastore: DataStore):
-        self._log = get_logger_for(f'KV')
+        self._log = midp_logger(f'KV')
         self._datastore = datastore
         self._table_name = 'kv'
 

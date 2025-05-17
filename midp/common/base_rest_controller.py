@@ -13,7 +13,7 @@ from midp.common.token_manager import TokenManager
 from midp.common.web_helpers import make_generic_json_response, authenticate_with_bearer_token
 from midp.iam.dao.atomic import AtomicDao
 from midp.iam.models import PredefinedScope
-from midp.log_factory import get_logger_for_object
+from midp.log_factory import midp_logger_for
 
 T = TypeVar('T')
 
@@ -35,7 +35,7 @@ class BaseRestController(Generic[T]):
     _dao: AtomicDao[T]
 
     def __init__(self, dao: AtomicDao[T]):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
         self._token_manager: TokenManager = container.get(TokenManager)
 
     def _respond_with_error(self, status: int, error: str, error_description: Optional[str] = None):

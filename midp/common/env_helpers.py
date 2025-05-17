@@ -2,9 +2,9 @@ import json
 import os
 from typing import Any, Optional
 
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 
-log = get_logger_for('env')
+log = midp_logger('env')
 
 
 def required_env(env: str, help: Optional[str] = None) -> str:

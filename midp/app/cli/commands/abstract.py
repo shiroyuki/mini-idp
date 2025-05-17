@@ -11,7 +11,7 @@ from midp.app.cli.static_info import DEFAULT_CONTEXT
 from midp.app.models import ClientConfiguration
 from midp.app.web_client import MiniIDP
 from midp.common.env_helpers import optional_env
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 
 
 class UnsetCurrentContextError(RuntimeError):
@@ -24,7 +24,7 @@ class UnknownContextError(RuntimeError):
 
 class CLICommand(ABC):
     def __init__(self):
-        self._log = get_logger_for(f'CLI/{self.name()}')
+        self._log = midp_logger(f'CLI/{self.name()}')
 
     @classmethod
     def doc(cls):

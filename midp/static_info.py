@@ -5,9 +5,9 @@ from typing import Optional
 from pydantic import BaseModel
 
 from midp.common.env_helpers import optional_env
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 
-log = get_logger_for('mini-idp')
+log = midp_logger('mini-idp')
 
 
 class __VersionInfo(BaseModel):
@@ -47,15 +47,15 @@ if OVERRIDING_ACCESS_TOKEN_TTL_RAW:
         if OVERRIDING_ACCESS_TOKEN_TTL < 0:
             raise RuntimeError('The TTL for access tokens must be positive number.')
         elif OVERRIDING_ACCESS_TOKEN_TTL > ACCESS_TOKEN_TTL_SAFE_MAX:
-            log.warning(f"WARNING: The TTL for access tokens is longer the suggested one "
+            log.warning(f"The TTL for access tokens is longer the suggested one "
                         f"({ACCESS_TOKEN_TTL_SAFE_MAX}s).")
         # Override the TTL for access tokens.
         ACCESS_TOKEN_TTL = OVERRIDING_ACCESS_TOKEN_TTL
-        log.warning(f"WARNING: The TTL for access tokens is set to {ACCESS_TOKEN_TTL}s.")
+        log.warning(f"The TTL for access tokens is set to {ACCESS_TOKEN_TTL}s.")
     else:
         raise RuntimeError('The given/overriding TTL for access tokens must be positive number.')
 else:
-    log.warning("WARNING: The \"default\" TTL for access tokens is used.")
+    log.warning("The \"default\" TTL for access tokens is used.")
 
 REFRESH_TOKEN_TTL_DEFAULT = ACCESS_TOKEN_TTL_DEFAULT * 24  # 12 hours
 REFRESH_TOKEN_TTL_SAFE_MAX = ACCESS_TOKEN_TTL_SAFE_MAX * 7  # 1 Week
@@ -71,15 +71,15 @@ if OVERRIDING_REFRESH_TOKEN_TTL_RAW:
         if OVERRIDING_REFRESH_TOKEN_TTL < 0:
             raise RuntimeError('The TTL for refresh tokens must be positive number.')
         elif OVERRIDING_REFRESH_TOKEN_TTL > REFRESH_TOKEN_TTL_SAFE_MAX:
-            log.warning(f"WARNING: The TTL for refresh tokens is longer the suggested one "
+            log.warning(f"The TTL for refresh tokens is longer the suggested one "
                         f"({REFRESH_TOKEN_TTL_SAFE_MAX}s).")
         # Override the TTL for refresh tokens.
         REFRESH_TOKEN_TTL = OVERRIDING_REFRESH_TOKEN_TTL
-        log.warning(f"WARNING: The TTL for refresh tokens is set to {REFRESH_TOKEN_TTL}s.")
+        log.warning(f"The TTL for refresh tokens is set to {REFRESH_TOKEN_TTL}s.")
     else:
         raise RuntimeError('The given/overriding TTL for refresh tokens must be positive number.')
 else:
-    log.warning("WARNING: The \"default\" TTL for refresh tokens is used.")
+    log.warning("The \"default\" TTL for refresh tokens is used.")
 
 PUBLIC_FILE_PATH = os.path.join(os.path.dirname(__file__), 'public')
 WEB_FRONTEND_FILE_PATH = os.path.join(os.path.dirname(__file__), 'webui')

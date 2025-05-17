@@ -10,9 +10,9 @@ from starlette.responses import Response
 from midp.common.renderer import TemplateRenderer
 from midp.common.session_manager import SessionManager, Session
 from midp.common.token_manager import TokenManager, InvalidTokenError
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 
-mod_logger = get_logger_for("midp.common.web_helpers")
+mod_logger = midp_logger("midp.common.web_helpers")
 
 
 class GenericResponse(BaseModel):

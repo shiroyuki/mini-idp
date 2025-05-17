@@ -9,7 +9,7 @@ from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMOAuthClient, IAMRole, IAMUser
-from midp.log_factory import get_logger_for_object
+from midp.log_factory import midp_logger_for
 
 
 class InvalidSubjectError(RuntimeError):
@@ -29,7 +29,7 @@ class PolicyResolution(BaseModel):
 @Service()
 class PolicyResolver(object):
     def __init__(self, client_dao: ClientDao, policy_dao: PolicyDao, role_dao: RoleDao, user_dao: UserDao):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
         self._self_reference_uri = SELF_REFERENCE_URI
         self._client_dao = client_dao
         self._policy_dao = policy_dao

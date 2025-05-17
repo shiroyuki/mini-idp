@@ -10,7 +10,7 @@ from requests import Session, Response
 from midp.app.web_client import MiniIDP, ClientOutput, WebClientLocalStorageManager
 from midp.common.env_helpers import optional_env
 from midp.iam.models import IAMOAuthClient, GrantType
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from midp.snapshot.models import AppSnapshot
 from midp.snapshot.utils import bootstrap
 
@@ -69,7 +69,7 @@ class GenericDeferrableFeature:
 class GenericAppFeature(GenericDeferrableFeature, TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._log = get_logger_for(cls.__name__)
+        cls._log = midp_logger(cls.__name__)
         cls._http_session = requests.Session()
         cls.defer_after_all(cls._http_session.close)
 

@@ -13,13 +13,13 @@ from midp.common.env_helpers import optional_env, IN_DEBUG_MODE
 from midp.common.web_helpers import InvalidBearerToken, MissingBearerToken
 from midp.iam.handlers import iam_rest_routers
 from midp.iam.rpc_handlers import iam_rpc_router
-from midp.log_factory import get_logger_for
+from midp.log_factory import midp_logger
 from midp.oauth.handler import oauth_router
 from midp.oauth.models import OpenIDConfiguration
 from midp.snapshot.handler import recovery_router
 
 app = FastAPI(title=static_info.ARTIFACT_ID, version=static_info.VERSION)
-log = get_logger_for('root:web')
+log = midp_logger('root:web')
 
 MINI_IDP_DEV_PERMANENT_DELAY = float(optional_env('MINI_IDP_DEV_PERMANENT_DELAY',
                                                   '0',

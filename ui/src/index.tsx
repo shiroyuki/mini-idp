@@ -99,7 +99,7 @@ const getPermissionPerUser: PerResourcePermissionFetcher = (item: GenericModel) 
 
 function makeUserManagerPage() {
     return <ResourceManagerPage
-        baseBackendUri={"/rest/users"}
+        baseBackendUri={"/rest/iam/users"}
         baseFrontendUri={"/users"}
         schema={IAM_USER_SCHEMA}
         listPage={
@@ -113,7 +113,7 @@ function makeUserManagerPage() {
 
 function makeRoleManagerPage() {
     return <ResourceManagerPage
-        baseBackendUri={"/rest/roles"}
+        baseBackendUri={"/rest/iam/roles"}
         baseFrontendUri={"/roles"}
         schema={IAM_ROLE_SCHEMA}
         listPage={
@@ -127,7 +127,7 @@ function makeRoleManagerPage() {
 
 function makeScopeManagerPage() {
     return <ResourceManagerPage
-        baseBackendUri={"/rest/scopes"}
+        baseBackendUri={"/rest/iam/scopes"}
         baseFrontendUri={"/scopes"}
         schema={IAM_SCOPE_SCHEMA}
         listPage={
@@ -141,7 +141,7 @@ function makeScopeManagerPage() {
 
 function makeOAuthClientManagerPage() {
     return <ResourceManagerPage
-        baseBackendUri={"/rest/clients"}
+        baseBackendUri={"/rest/iam/clients"}
         baseFrontendUri={"/clients"}
         schema={IAM_OAUTH_CLIENT_SCHEMA}
         listPage={
@@ -155,7 +155,7 @@ function makeOAuthClientManagerPage() {
 
 function makePolicyManagerPage() {
     return <ResourceManagerPage
-        baseBackendUri={"/rest/policies"}
+        baseBackendUri={"/rest/iam/policies"}
         baseFrontendUri={"/policies"}
         schema={IAM_POLICY_SCHEMA}
         listPage={

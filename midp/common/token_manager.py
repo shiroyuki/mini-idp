@@ -14,7 +14,7 @@ from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser, IAMOAuthClient
-from midp.log_factory import get_logger_for_object
+from midp.log_factory import midp_logger_for
 from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
 
 
@@ -58,7 +58,7 @@ class TokenManager:
                  user_dao: UserDao,
                  policy_dao: PolicyDao,
                  client_dao: ClientDao):
-        self._logger = get_logger_for_object(self)
+        self._logger = midp_logger_for(self)
         self._enigma = enigma
         self._policy_resolver = policy_resolver
         self._user_dao = user_dao

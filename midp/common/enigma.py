@@ -11,7 +11,7 @@ from imagination.decorator import EnvironmentVariable
 from imagination.decorator.service import registered
 
 from midp.common.env_helpers import optional_env
-from midp.log_factory import get_logger_for_object
+from midp.log_factory import midp_logger_for
 
 
 @registered(
@@ -36,7 +36,7 @@ class Enigma:
                  public_key_pem_file_path: str,
                  cryptographic_algorithm: Optional[str] = None,
                  hashing_algorithm: Optional[str] = None):
-        self._log = get_logger_for_object(self)
+        self._log = midp_logger_for(self)
 
         self._private_key: Optional[RSAPrivateKey] = None
         self._public_key: Optional[RSAPublicKey] = None

@@ -1,7 +1,7 @@
 import UIFoundation from "../components/UIFoundation";
 import {FC, ReactElement, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Navigation, UIFoundationHeader} from "../components/UIFoundationHeader";
-import {ClientOptions, http} from "../common/http-client";
+import {ClientOptions, http, HttpError, SuppressableHttpError} from "../common/http-client";
 import classNames from "classnames";
 import {LinearLoadingAnimation} from "../components/loaders";
 import {Link, useNavigate, useNavigation, useParams, useResolvedPath} from "react-router-dom";
@@ -101,14 +101,11 @@ type SoloProps = {
     getPermissions: PerResourcePermissionFetcher
 }
 
-const makeClientOptions = (additionals?: ClientOptions) => {
+const makeClientOptions = (handleHttp403: (r: Response) => Error, additionals?: ClientOptions) => {
     return {
-        handleError: response => {
-            switch (response.status) {
-                case 401:
-                    ejectToLoginScreen();
-                    break;
-            }
+        errors: {
+            401: (r) => ejectToLoginScreen(),
+            403: (r) => handleHttp403 ? handleHttp403(r) : new SuppressableHttpError(r.status, ''),
         },
         ...(additionals || {}),
     } as ClientOptions
@@ -124,6 +121,7 @@ export const SoloResource = ({
                              }: SoloProps) => {
     const navigate = useNavigate();
 
+    const [error, setError] = useState<string|null>(null); // TODO implemented the error state.
     const [inFlight, setInFlight] = useState<boolean>(false);
     const [dirtyFields, setDirtyFields] = useState<string[]>([]);
     const [currentMode, setCurrentMode] = useState<ResourceViewMode | undefined>(id === undefined ? "creator" : "reader");
@@ -144,7 +142,10 @@ export const SoloResource = ({
         http.sendAndMapAs<any>(
             "get",
             `${baseBackendUri}/${id}`,
-            makeClientOptions()
+            makeClientOptions((r) => {
+                setError('Access denied'); // TODO re-visit the error handling procedure.
+                return new SuppressableHttpError(403, '');
+            })
         )
             .then(
                 (data) => {
@@ -163,7 +164,19 @@ export const SoloResource = ({
 
     const updateRemoteCopy = useCallback(async () => {
         if (id === undefined) {
-            const data = await http.sendAndMapAs<GenericModel>("post", `${baseBackendUri}/`, makeClientOptions({json: resource}));
+            const data = await http.sendAndMapAs<GenericModel>(
+                "post",
+                `${baseBackendUri}/`,
+                makeClientOptions(
+                    (r) => {
+                        setError('Access denied'); // TODO re-visit the error handling procedure.
+                        return new SuppressableHttpError(403, '');
+                    },
+                    {
+                        json: resource,
+                    }
+                )
+            );
             if (onCreate && data) {
                 onCreate(data as GenericModel);
             }
@@ -187,7 +200,17 @@ export const SoloResource = ({
             setCurrentMode("writing");
 
             try {
-                const data = await http.sendAndMapAs<any>("put", `${baseBackendUri}/${resource.id}`, makeClientOptions({json: patch}));
+                const data = await http.sendAndMapAs<any>(
+                    "put",
+                    `${baseBackendUri}/${resource.id}`,
+                    makeClientOptions(
+                        (r) => {
+                            setError('Access denied'); // TODO re-visit the error handling procedure.
+                            return new SuppressableHttpError(403, '');
+                        },
+                        {json: patch}
+                    )
+                );
                 setResource(data);
                 setDirtyFields([]);
                 setCurrentMode("reader");
@@ -288,7 +311,7 @@ const FieldValueList = ({allResources, listRenderingOption, selectedItems}: Fiel
 
     return (
         <>
-            <ul data-count={filteredList.length} data-display-limit={minimalListSize}>
+            <ul className={styles.fieldArray} data-count={filteredList.length} data-display-limit={minimalListSize}>
                 {
                     displayedList
                         .map(item => (
@@ -350,6 +373,8 @@ const ResourceList = ({
                           getPermissions,
                       }: ListProps) => {
     const navigate = useNavigate();
+    const [warnings, setWarnings] = useState<string[]>([]);
+    const [error, setError] = useState<string | null>(null)
     const [inFlight, setInFlight] = useState<number>(0);
     const [dataTableControllerMode, setDataTableControllerMode] = useState<DataTableControllerMode>("navigator");
     const [cacheMap, setCacheMap] = useState<{ [key: string]: any }>({});
@@ -386,6 +411,13 @@ const ResourceList = ({
                 const fieldListRendering = field.listRendering as ListRenderingOptions;
                 setInFlight(prevState => prevState + 1);
                 fieldListRendering.load()
+                    .catch((error: HttpError) => {
+                        setWarnings(prevState => {
+                            prevState.push(`Failed to fetch the data for ${fieldName}. (${error})`);
+
+                            return prevState;
+                        });
+                    })
                     .then(availableItems => {
                         const fieldKey = fieldName;
                         setCacheMap(prevState => {
@@ -393,9 +425,11 @@ const ResourceList = ({
                             newState = {...prevState};
                             newState[fieldKey] = availableItems;
                             return newState;
-                        })
-                        setInFlight(prevState => prevState - 1);
+                        });
                     })
+                    .finally(() => {
+                        setInFlight(prevState => prevState - 1);
+                    });
             }
         }
     }, [schema.properties])
@@ -403,12 +437,27 @@ const ResourceList = ({
     const loadResources = useCallback(() => {
         setInFlight(prevState => prevState + 1);
 
-        http.sendAndMapAs<any[]>(
+        http.sendAndMapAs<GenericModel[]>(
             "get",
             `${baseBackendUri}/`,
-            makeClientOptions()
-        ).then((data) => {
-            setResourceList(data);
+            makeClientOptions((r) => {
+                setError('Access denied'); // TODO re-visit the error handling procedure.
+                return new SuppressableHttpError(403, '');
+            })
+        ).catch((error: HttpError) => {
+            console.warn("Access denied");
+            if (error.status === 403) {
+                setError("Insufficient permission");
+            } else {
+                throw error;
+            }
+        }).then(data => {
+            console.log('PANDA: Received from', baseBackendUri)
+            if (data === null) {
+                console.error('PANDA: Alert for', baseBackendUri)
+            }
+            setResourceList(data ?? []);
+        }).finally(() => {
             setInFlight(prevState => prevState - 1);
         });
 
@@ -511,16 +560,25 @@ const ResourceList = ({
     }, [getPermissions, dataTableControllerMode, selectionCollection, toggleSelection, renderField, schema.properties]);
 
     const writableResourceCount = useMemo(
-        () => resourceList === undefined
-            ? 0
-            : resourceList
-                .filter(resource => getPermissions(resource).includes("delete"))
-                .length,
+        () => (resourceList ?? [])
+            .filter(resource => getPermissions(resource).includes("delete"))
+            .length,
         [resourceList, getPermissions]
     );
 
     if (resourceList === undefined || cacheMap === undefined || inFlight > 0) {
         return <LinearLoadingAnimation label={"Loading..."}/>;
+    }
+
+    if (error !== null) {
+        return (
+            <>
+                <h1>{error}</h1>
+                <p>
+                    Please contact your local support for further assistance.
+                </p>
+            </>
+        );
     }
 
     return (
@@ -550,9 +608,11 @@ const ResourceList = ({
                                                 await http.send(
                                                     "delete",
                                                     `${baseBackendUri}/${selection.id}`,
-                                                    makeClientOptions()
+                                                    makeClientOptions((r) => {
+                                                        setError('Access denied'); // TODO re-visit the error handling procedure.
+                                                        return new SuppressableHttpError(403, '');
+                                                    })
                                                 );
-                                                // TODO Implement proper error handling.
                                             }
 
                                             setSelectionList([]);

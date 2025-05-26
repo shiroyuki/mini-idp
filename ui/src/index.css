@@ -252,13 +252,13 @@ form {
             font-size: 12px;
         }
 
-        tr:nth-child(2n + 1) td {
-            background-color: var(--veryLightGrey);
-        }
+        /*tr:nth-child(2n + 1) td {*/
+        /*    background-color: var(--veryLightGrey);*/
+        /*}*/
 
-        tr:nth-child(2n) td {
-            background-color: var(--white);
-        }
+        /*tr:nth-child(2n) td {*/
+        /*    background-color: var(--white);*/
+        /*}*/
     }
 
     .data-table-navigator {

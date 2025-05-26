@@ -131,22 +131,21 @@
 }
 
 .dataBlockObject {
+    overflow: hidden;
     border-spacing: 0;
-    border: 1px solid var(--grey);
+    border-left: 3px solid var(--grey);
+    background-color: var(--veryLightGrey);
 
     th {
         text-align: left;
-        padding: 4px 8px !important;
+        padding: 6px 8px !important;
         border: none !important;
-        border-top: 1px solid var(--lightGrey) !important;
-        border-right: 1px solid var(--lightGrey) !important;
         background-color: transparent !important;
     }
 
     td {
-        padding: 4px 8px !important;
+        padding: 6px 8px !important;
         border: none !important;
-        border-top: 1px solid var(--lightGrey) !important;
         background-color: transparent !important;
     }
 }

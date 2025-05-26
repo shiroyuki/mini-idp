@@ -1,4 +1,3 @@
-import {storage} from "./storage";
 import {getAccessToken} from "./token";
 
 export type ClientOptions = {
@@ -12,7 +11,8 @@ export type ClientOptions = {
      *
      * @param response
      */
-    handleError?: (response: Response) => void;
+    handleError?: (response: Response) => Error;
+    errors?: { [status: number]: (response: Response) => Error }
     headers?: { [key: string]: string },
     json?: any,
 };
@@ -28,9 +28,18 @@ export class HttpError extends Error {
     }
 }
 
+/**
+ * HTTP Error which can be suppressable.
+ */
+export class SuppressableHttpError extends HttpError {
+    constructor(status: number, body: string) {
+        super(status, body);
+    }
+}
+
 export class HttpClient {
     /**
-     * Send a HTTP request.
+     * Send an HTTP request.
      */
     async send(method: "get" | "post" | "put" | "delete", url: string, options?: ClientOptions): Promise<Response> {
         const authRequired = options?.authRequired || false;
@@ -72,18 +81,23 @@ export class HttpClient {
      */
     async sendAndMapAs<T>(method: "get" | "post" | "put" | "delete", url: string, options?: ClientOptions): Promise<T> {
         const response = await this.send(method, url, options);
+        const responseStatus = response.status;
+        const errorHandlerMap = options?.errors ?? {};
+        const handleError = options?.handleError;
 
-        if ((options?.okStatusCodes || [200]).includes(response.status)) {
+        if ((options?.okStatusCodes || [200]).includes(responseStatus)) {
             const responseText = await response.text();
             return JSON.parse(responseText) as T;
+        } else if (errorHandlerMap && errorHandlerMap[responseStatus]) {
+            console.error(`HTTP ${responseStatus}: ${method.toUpperCase()} ${url} (handled-${responseStatus})`)
+            throw errorHandlerMap[responseStatus](response);
+        } else if (handleError) {
+            console.error(`HTTP ${responseStatus}: ${method.toUpperCase()} ${url} (handled-any)`)
+            throw handleError(response);
         } else {
-            if (options?.handleError) {
-                options?.handleError(response);
-                throw new HttpError(response.status, '(omitted)');
-            } else {
-                const responseText = await response.text();
-                throw new HttpError(response.status, responseText || '(no response body)');
-            }
+            console.error(`HTTP ${responseStatus}: ${method.toUpperCase()} ${url} (unhandled)`)
+            const responseText = await response.text();
+            throw new HttpError(responseStatus, responseText || '(no response body)');
         }
     }
 }

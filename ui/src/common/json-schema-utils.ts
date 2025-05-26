@@ -8,9 +8,11 @@ export async function sendListRequestTo<T>(url: string) {
         "get",
         url,
         {
-            handleError: response => {
+            handleError: async (response) => {
                 if (response.status === 401) {
                     ejectToLoginScreen();
+                } else if (response.status === 403) {
+                    console.warn(`Unable to fetch the data from ${url} (error bypassed)`);
                 } else {
                     response.text().then(content => {
                         throw new HttpError(response.status, content)
@@ -23,7 +25,7 @@ export async function sendListRequestTo<T>(url: string) {
 
 export function listItemsFrom<T>(listUrl: string): DataLoader<T> {
     return async () => {
-        return await sendListRequestTo<T>(listUrl);
+        return (await sendListRequestTo<T>(listUrl)) || [];
     }
 }
 

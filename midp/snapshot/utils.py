@@ -6,16 +6,17 @@ from typing import Optional, Any, Dict, List
 import yaml
 from imagination import container
 
-from midp.common.env_helpers import SELF_REFERENCE_URI, BOOTING_OPTIONS, required_env, optional_env
+from midp.common.env_helpers import required_env, optional_env
+from midp.static_info import BOOTING_OPTIONS
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao
 from midp.iam.dao.scope import ScopeDao
 from midp.iam.dao.user import UserDao
-from midp.iam.models import IAMScope, IAMUser, IAMPolicy, IAMPolicySubject, PredefinedRole, \
+from midp.iam.models import IAMUser, PredefinedRole, \
     PredefinedScope, PredefinedPolicy
 from midp.log_factory import midp_logger
-from midp.rds import DataStore, DataStoreSession
+from midp.common.rds import DataStore, DataStoreSession
 from midp.snapshot.models import AppSnapshot
 
 log = midp_logger("snapshot.utils")

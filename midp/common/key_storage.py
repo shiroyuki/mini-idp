@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from midp.log_factory import midp_logger
-from midp.rds import DataStore
+from midp.common.rds import DataStore
 
 
 class Entry(BaseModel):

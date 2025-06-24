@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 from imagination.decorator.service import Service
 from pydantic import BaseModel, Field
 
-from midp.common.env_helpers import SELF_REFERENCE_URI
+from midp.static_info import SELF_REFERENCE_URI
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.role import RoleDao

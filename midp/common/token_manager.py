@@ -8,35 +8,17 @@ from jwt import ExpiredSignatureError, DecodeError
 from pydantic import BaseModel
 
 from midp.common.enigma import Enigma
-from midp.common.env_helpers import SELF_REFERENCE_URI
 from midp.common.policy_manager import PolicyResolver
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao
 from midp.iam.dao.user import UserDao
 from midp.iam.models import IAMPolicySubject, IAMPolicy, IAMUser, IAMOAuthClient
 from midp.log_factory import midp_logger_for
-from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
+from midp.static_info import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, SELF_REFERENCE_URI
 
 
 class InvalidTokenError(RuntimeError):
     pass
-
-
-@Service()
-class TokenParser:
-    def __init__(self, enigma: Enigma):
-        self._enigma = enigma
-
-    def parse(self, token: str, audience: Optional[str] = None) -> Dict[str, Any]:
-        claims: Dict[str, Any] = dict()
-
-        try:
-            claims.update(
-                self._enigma.decode(token, issuer=SELF_REFERENCE_URI, audience=audience or SELF_REFERENCE_URI))
-        except ExpiredSignatureError:
-            raise InvalidTokenError()
-
-        return claims
 
 
 class TokenSet(BaseModel):

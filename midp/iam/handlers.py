@@ -8,7 +8,7 @@ from midp.common.base_rest_controller import BaseRestController
 from midp.iam.models import IAMOAuthClient, IAMPolicy, IAMRole, IAMScope, IAMUser
 from midp.iam.realm_rest_controller import PolicyRestController, ClientRestController, \
     RoleRestController, ScopeRestController, UserRestController
-from midp.rds import DataStore
+from midp.common.rds import DataStore
 
 T = TypeVar('T')
 

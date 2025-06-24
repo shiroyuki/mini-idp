@@ -2,7 +2,7 @@ from imagination.decorator.service import Service
 
 from midp.iam.dao.atomic import AtomicDao
 from midp.iam.models import IAMPolicy
-from midp.rds import DataStore
+from midp.common.rds import DataStore
 
 
 @Service()

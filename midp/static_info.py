@@ -84,3 +84,10 @@ else:
 PUBLIC_FILE_PATH = os.path.join(os.path.dirname(__file__), 'public')
 WEB_FRONTEND_FILE_PATH = os.path.join(os.path.dirname(__file__), 'webui')
 DEFAULT_APP_NAME = 'idp.dev.shiroyuki.com'
+BOOTING_OPTIONS = optional_env('MINI_IDP_BOOTING_OPTIONS',
+                               '',
+                               help="Mini IDP booting options").split(',')
+SELF_REFERENCE_URI = optional_env('MINI_IDP_SELF_REF_URI',
+                                  'http://localhost:8081/',
+                                  help="Self reference URI back to this service")
+IN_DEBUG_MODE = optional_env('MINI_IDP_DEBUG', '', help="The debug mode flag").lower() in ['1', 'true']

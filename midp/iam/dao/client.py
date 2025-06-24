@@ -5,7 +5,7 @@ from imagination.decorator.service import Service
 from midp.common.enigma import Enigma
 from midp.iam.dao.atomic import AtomicDao
 from midp.iam.models import IAMOAuthClient
-from midp.rds import DataStore
+from midp.common.rds import DataStore
 
 
 @Service()

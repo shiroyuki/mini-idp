@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Iterable
 from uuid import uuid4
 from pydantic import BaseModel, Field
 
-from midp.common.env_helpers import SELF_REFERENCE_URI
+from midp.static_info import SELF_REFERENCE_URI
 
 
 class IAMScope(BaseModel):

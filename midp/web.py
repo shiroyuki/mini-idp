@@ -9,7 +9,8 @@ from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 from midp import static_info
-from midp.common.env_helpers import optional_env, IN_DEBUG_MODE
+from midp.common.env_helpers import optional_env
+from midp.static_info import IN_DEBUG_MODE
 from midp.common.web_helpers import InvalidBearerToken, MissingBearerToken
 from midp.iam.handlers import iam_rest_routers
 from midp.iam.rpc_handlers import iam_rpc_router

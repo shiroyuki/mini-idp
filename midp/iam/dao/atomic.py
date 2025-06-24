@@ -4,8 +4,8 @@ from typing import Generic, TypeVar, Any, Dict, Optional, Generator, Callable, L
 
 from pydantic import BaseModel
 
-from midp.log_factory import midp_logger, midp_logger_for
-from midp.rds import DataStore, DataStoreSession
+from midp.log_factory import midp_logger_for
+from midp.common.rds import DataStore, DataStoreSession
 
 T = TypeVar('T')
 

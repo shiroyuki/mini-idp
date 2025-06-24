@@ -1,6 +1,5 @@
 import asyncio
 import json
-from abc import ABC
 from time import time
 from typing import Any, Optional, Dict, List, Union
 
@@ -19,7 +18,7 @@ class Entry(BaseModel):
 
 
 @Service()
-class KeyStorage(ABC):
+class KeyStorage:
     def __init__(self, datastore: DataStore):
         self._log = midp_logger(f'KV')
         self._datastore = datastore

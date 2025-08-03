@@ -1,3 +1,4 @@
+*.iml
 midp/webui/assets
 .DS_Store
 .idea-pycharm

@@ -4,7 +4,7 @@ from fastapi import Depends
 from imagination.decorator.service import Service
 from starlette.requests import Request
 
-from midp.common.base_rest_controller import BaseRestController, T
+from midp.common.base_rest_controller import BaseRestController
 from midp.common.web_helpers import authenticate_with_bearer_token
 from midp.iam.dao.client import ClientDao
 from midp.iam.dao.policy import PolicyDao

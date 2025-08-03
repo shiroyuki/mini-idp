@@ -5,13 +5,14 @@ import {ClientOptions, http, HttpError, SuppressableHttpError} from "../common/h
 import classNames from "classnames";
 import {LinearLoadingAnimation} from "../components/loaders";
 import {Link, useNavigate, useNavigation, useParams, useResolvedPath} from "react-router-dom";
-import {DataBlock, ResourceView, ResourceViewMode} from "../components/ResourceView";
+import {ResourceView, ResourceViewMode} from "../components/ResourceView";
 import {ejectToLoginScreen, ListCollection} from "../common/helpers";
 import Icon from "../components/Icon";
 import {VCheckbox} from "../components/VElements";
 import styles from "./ResourceManagerPage.module.css"
 import {ErrorFeedback, GenericModel} from "../common/definitions";
 import {ListRenderingOptions, NormalizedItem, ResourceSchema} from "../common/json-schema-definitions";
+import {RecourceFieldDataBlock} from "../components/RecourceFieldDataBlock";
 
 export type PerResourcePermission = "list" | "read" | "write" | "delete";
 export type PerResourcePermissionFetcher = (item: GenericModel) => PerResourcePermission[]
@@ -317,7 +318,7 @@ const FieldValueList = ({allResources, listRenderingOption, selectedItems}: Fiel
                         .map(item => (
                             <li key={item.value}
                                 className={classNames([item.checked ? "selected" : "not-selected"])}>
-                                {item.label ?? <DataBlock data={item.value}/>}
+                                {item.label ?? <RecourceFieldDataBlock data={item.value}/>}
                             </li>
                         ))
                 }
@@ -349,7 +350,7 @@ const FieldValuePrimitive = ({baseFrontendUri, field, data}: FieldValuePrimitive
         : undefined;
 
     return (
-        <DataBlock
+        <RecourceFieldDataBlock
             data={data}
             href={href}
             onClick={handleClick}

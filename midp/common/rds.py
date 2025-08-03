@@ -1,7 +1,7 @@
 import traceback
 import uuid
 from contextlib import contextmanager
-from typing import Dict, Any, Union, List, ContextManager, Generator
+from typing import Dict, Any, Union, List, Generator
 
 from imagination.decorator.config import EnvironmentVariable
 from imagination.decorator.service import Service

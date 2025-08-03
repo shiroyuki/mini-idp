@@ -6,7 +6,7 @@ from imagination.standalone import use
 
 from midp.common.base_rest_controller import BaseRestController
 from midp.iam.models import IAMOAuthClient, IAMPolicy, IAMRole, IAMScope, IAMUser
-from midp.iam.realm_rest_controller import PolicyRestController, ClientRestController, \
+from midp.iam.rest_controller import PolicyRestController, ClientRestController, \
     RoleRestController, ScopeRestController, UserRestController
 from midp.common.rds import DataStore
 

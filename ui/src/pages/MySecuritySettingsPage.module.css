@@ -1,0 +1,8 @@
+.passwordChangingSection {
+    display: flex;
+    flex-direction: row;
+
+    & > form {
+        min-width: 480px;
+    }
+}

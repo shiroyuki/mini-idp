@@ -19,6 +19,8 @@ import {MyProfilePage} from "./pages/MyProfilePage";
 import {IAMPolicy, IAMRole, IAMScope, IAMUser} from "./common/models";
 import {getAccessToken} from "./common/token";
 import {GenericModel} from "./common/definitions";
+import {MySecuritySettingsPage} from "./pages/MySecuritySettingsPage";
+import {Redirection} from "./components/Redirection";
 
 const convertScopesToPermissions = (scopePrefix: string): PerResourcePermission[] => {
     const token = getAccessToken();
@@ -246,9 +248,17 @@ const router = createHashRouter([
                 ]
             },
             {
+                path: 'account/',
+                element: <Redirection to={'profile'}/>,
+            },
+            {
                 path: 'account/profile',
                 // @ts-ignore
                 element: <MyProfilePage/>,
+            },
+            {
+                path: 'account/security',
+                element: <MySecuritySettingsPage/>,
             },
         ]
     },
@@ -265,6 +275,6 @@ root.render(
 );
 
 // If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
+// to log results (for example, reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();

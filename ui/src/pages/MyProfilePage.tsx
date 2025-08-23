@@ -19,8 +19,6 @@ export const MyProfilePage = () => {
         return <LinearLoadingAnimation label={"Loading..."}/>;
     }
 
-    console.log("PANDA: sessionData", JSON.stringify(sessionData));
-
     return (
         <UIFoundation>
             <UIFoundationHeader
